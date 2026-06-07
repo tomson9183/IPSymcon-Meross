@@ -75,14 +75,17 @@ trait RollerDevice
                     $this->SetValue('MOVE', 2);
                     $this->RollerStartFollow(0);
                 }
-            } else {                   // Stop -> State 0 (Best effort)
-                $resp = $this->RollerSetState(0);
-                $this->RollerLog('Stop (State=0)', 0, $resp);
+            } else {                   // Stop -> aktuelle Position anfahren = anhalten
+                $this->RollerStopFollow();
+                $cur  = (int) $this->GetValue('LEVEL');
+                $resp = $this->RollerSetPosition($cur);
+                $this->RollerLog("Stop (Position=$cur)", $cur, $resp);
                 if ($resp !== null) {
                     $this->SetValue('MOVE', 1);
                 }
-                $this->RollerStopFollow();
-                $this->RollerUpdate();
+                $this->SetValue('LEVEL', $cur);
+                // kurz nicht ueberschreiben, dann echte Position bestaetigen
+                $this->WriteAttributeInteger('FollowUntil', time() + 3);
             }
             return;
         }
@@ -164,12 +167,6 @@ trait RollerDevice
     private function RollerSetPosition(int $pos)
     {
         return $this->LocalRequest('Appliance.RollerShutter.Position', 'SET', ['position' => ['position' => $pos, 'channel' => 0]]);
-    }
-
-    // Stop (Best effort). state 0 = Stop. Objekt-Form.
-    private function RollerSetState(int $state)
-    {
-        return $this->LocalRequest('Appliance.RollerShutter.State', 'SET', ['state' => ['state' => $state, 'channel' => 0]]);
     }
 
     private function RollerUpdate()
