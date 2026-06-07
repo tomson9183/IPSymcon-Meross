@@ -1,0 +1,11 @@
+{
+    "id": "{E2F1EC32-BEE9-4EB7-B793-09043718458C}",
+    "name": "MerossDevice",
+    "type": 3,
+    "vendor": "Meross",
+    "prefix": "MERO",
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "aliases": []
+}

@@ -1,0 +1,11 @@
+{
+    "id": "{D3DB5D01-F263-4827-B051-546890FE3C05}",
+    "name": "MerossConfigurator",
+    "type": 4,
+    "vendor": "Meross",
+    "prefix": "MEROC",
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "aliases": []
+}

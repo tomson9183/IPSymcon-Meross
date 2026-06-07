@@ -1,0 +1,12 @@
+{
+    "id": "{CB8DA76E-8D9F-4954-BDD9-303A3A9FBE72}",
+    "author": "tomson9183",
+    "name": "Meross",
+    "url": "https://github.com/tomson9183/IPSymcon-Meross",
+    "compatibility": {
+        "version": "6.0"
+    },
+    "version": "1.2.1",
+    "build": 19,
+    "date": 0
+}

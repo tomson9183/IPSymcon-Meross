@@ -1,0 +1,58 @@
+{
+    "elements": [
+        {
+            "type": "ValidationTextBox",
+            "name": "Host",
+            "caption": "Lokale IP des Geräts (feste IP in der Fritzbox empfohlen)"
+        },
+        {
+            "type": "Select",
+            "name": "DeviceType",
+            "caption": "Gerätetyp",
+            "options": [
+                { "caption": "MSS210P – Steckdose (1 Kanal)", "value": "mss210p" },
+                { "caption": "MSS620 – Doppelsteckdose (2 Kanäle)", "value": "mss620" },
+                { "caption": "MRS100 – Rollladen", "value": "mrs100" }
+            ]
+        },
+        {
+            "type": "ValidationTextBox",
+            "name": "DeviceName",
+            "caption": "Name"
+        },
+        {
+            "type": "PasswordTextBox",
+            "name": "Key",
+            "caption": "Konto-Key (wird beim Hinzufügen aus der Cloud automatisch gesetzt)"
+        },
+        {
+            "type": "NumberSpinner",
+            "name": "PollInterval",
+            "caption": "Status alle … Sekunden abfragen (0 = aus)",
+            "suffix": "s"
+        }
+    ],
+    "actions": [
+        {
+            "type": "Button",
+            "caption": "Status jetzt abrufen",
+            "onClick": "MERO_Update($id);"
+        },
+        {
+            "type": "Button",
+            "caption": "Geräte-Fähigkeiten lokal auslesen (für Diagnose)",
+            "onClick": "MERO_Abilities($id);"
+        },
+        {
+            "type": "Button",
+            "caption": "Rollladen-Konfiguration / Kalibrierung auslesen (Diagnose)",
+            "onClick": "MERO_RollerConfig($id);"
+        }
+    ],
+    "status": [
+        { "code": 101, "icon": "inactive", "caption": "Erstellt" },
+        { "code": 102, "icon": "active", "caption": "Aktiv" },
+        { "code": 201, "icon": "error", "caption": "Gerät lokal nicht erreichbar" },
+        { "code": 202, "icon": "error", "caption": "Kein Konto-Key / keine IP gesetzt" }
+    ]
+}
