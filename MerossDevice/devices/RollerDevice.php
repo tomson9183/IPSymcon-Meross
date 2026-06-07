@@ -3,18 +3,22 @@
 declare(strict_types=1);
 
 // ---------------------------------------------------------------------
-//  Rollladen (MRS100): nativer IP-Symcon-Rollladen-Look.
-//  MOVE  : Integer mit Standardprofil ~ShutterMoveStop
-//          0 = Öffnen (Auf), 2 = Stop, 4 = Schließen (Zu)
-//  LEVEL : Integer 0..100 % (Position)
+//  Rollladen (MRS100) - lokale Steuerung ohne Cloud/MQTT.
 //
-//  WICHTIG (per meross_iot-Referenz bestaetigt): der Fahr-Befehl ist
-//  Appliance.RollerShutter.State mit method=SET und der Payload als
-//  OBJEKT  {"state":{"state":N,"channel":0}}  -- NICHT als Array.
-//    state 1 = Auf/Oeffnen, 2 = Zu/Schliessen, 0 = Stop
-//  Ebenso Position als Objekt  {"position":{"position":N,"channel":0}}.
-//  Die frueher gesehenen Array-PUSH-Meldungen waren nur Status-Meldungen
-//  des Geraets (kein Steuerbefehl) -- daher quittierte/abgelehnte SETs.
+//  WICHTIG (am Geraet verifiziert):
+//   * Der Motor faehrt ueber  Appliance.RollerShutter.Position [SET]
+//     mit OBJEKT-Payload  {"position":{"position":N,"channel":0}}.
+//     (N = 0..100, 100 = ganz auf, 0 = ganz zu)
+//   * Appliance.RollerShutter.State [SET] wird auf diesem Geraet NICHT
+//     ausgefuehrt -> daher Auf/Zu ebenfalls ueber Position (100 / 0).
+//
+//  Darstellung der Bedien-Variable MOVE:
+//   * VARIABLE_PRESENTATION_ENUMERATION (Aufzaehlung)
+//   * LAYOUT = 1 (Reihe) -> Buttons NEBENEINANDER statt Dropdown
+//   * DISPLAY = 0 (Beschriftung)
+//     MOVE-Werte:  0 = Auf, 1 = Stop, 2 = Zu
+//   * LEVEL bleibt der Positions-Schieberegler (0..100 %).
+//
 //  Wird als Trait in die Klasse MerossDevice eingebunden.
 // ---------------------------------------------------------------------
 
@@ -22,8 +26,20 @@ trait RollerDevice
 {
     private function RollerApplyChanges()
     {
-        $this->RegisterVariableInteger('MOVE', 'Rollladen', '~ShutterMoveStop', 10);
+        // Buttons nebeneinander (Aufzaehlung, Reihe)
+        $options = json_encode([
+            ['Value' => 0, 'Caption' => 'Auf',  'IconActive' => false, 'IconValue' => '', 'Color' => -1],
+            ['Value' => 1, 'Caption' => 'Stop', 'IconActive' => false, 'IconValue' => '', 'Color' => -1],
+            ['Value' => 2, 'Caption' => 'Zu',   'IconActive' => false, 'IconValue' => '', 'Color' => -1],
+        ]);
+        $this->RegisterVariableInteger('MOVE', 'Rollladen', [
+            'PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION,
+            'OPTIONS'      => $options,
+            'LAYOUT'       => 1, // 0=Spalte, 1=Reihe (nebeneinander), 2=Gitter
+            'DISPLAY'      => 0, // 0=Beschriftung, 1=Icon, 2=beides
+        ], 10);
         $this->EnableAction('MOVE');
+
         $this->RegisterVariableInteger('LEVEL', 'Position', 'MERO.Pos', 20);
         $this->EnableAction('LEVEL');
     }
@@ -32,23 +48,23 @@ trait RollerDevice
     {
         if ($Ident === 'MOVE') {
             $v = (int) $Value;
-            if ($v === 0) {            // Öffnen (Auf)  -> State 1
-                $resp = $this->RollerSetState(1);
-                $this->RollerLog('Auf (State=1)', 1, $resp);
+            if ($v === 0) {            // Auf  -> Position 100
+                $resp = $this->RollerSetPosition(100);
+                $this->RollerLog('Auf (Position=100)', 100, $resp);
                 if ($resp !== null) {
                     $this->SetValue('MOVE', 0);
                 }
-            } elseif ($v === 4) {      // Schließen (Zu) -> State 2
-                $resp = $this->RollerSetState(2);
-                $this->RollerLog('Zu (State=2)', 2, $resp);
+            } elseif ($v === 2) {      // Zu   -> Position 0
+                $resp = $this->RollerSetPosition(0);
+                $this->RollerLog('Zu (Position=0)', 0, $resp);
                 if ($resp !== null) {
-                    $this->SetValue('MOVE', 4);
+                    $this->SetValue('MOVE', 2);
                 }
-            } else {                   // Stop -> State 0
+            } else {                   // Stop -> State 0 (Best effort)
                 $resp = $this->RollerSetState(0);
                 $this->RollerLog('Stop (State=0)', 0, $resp);
                 if ($resp !== null) {
-                    $this->SetValue('MOVE', 2);
+                    $this->SetValue('MOVE', 1);
                 }
             }
             $this->RollerUpdate();
@@ -66,16 +82,16 @@ trait RollerDevice
         }
     }
 
-    // Fahrbefehl: Objekt-Form (NICHT Array). state 1=Auf, 2=Zu, 0=Stop
-    private function RollerSetState(int $state)
-    {
-        return $this->LocalRequest('Appliance.RollerShutter.State', 'SET', ['state' => ['state' => $state, 'channel' => 0]]);
-    }
-
-    // Position anfahren: ebenfalls Objekt-Form (NICHT Array).
+    // Fahrbefehl: Objekt-Form (NICHT Array). Dieser bewegt den Motor.
     private function RollerSetPosition(int $pos)
     {
         return $this->LocalRequest('Appliance.RollerShutter.Position', 'SET', ['position' => ['position' => $pos, 'channel' => 0]]);
+    }
+
+    // Stop (Best effort). state 0 = Stop. Objekt-Form.
+    private function RollerSetState(int $state)
+    {
+        return $this->LocalRequest('Appliance.RollerShutter.State', 'SET', ['state' => ['state' => $state, 'channel' => 0]]);
     }
 
     private function RollerUpdate()

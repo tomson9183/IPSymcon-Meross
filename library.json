@@ -4,9 +4,9 @@
     "name": "Meross",
     "url": "https://github.com/tomson9183/IPSymcon-Meross",
     "compatibility": {
-        "version": "6.0"
+        "version": "8.0"
     },
-    "version": "1.2.2",
-    "build": 20,
+    "version": "1.2.3",
+    "build": 21,
     "date": 0
 }
