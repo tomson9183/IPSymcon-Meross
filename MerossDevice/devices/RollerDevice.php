@@ -8,10 +8,13 @@ declare(strict_types=1);
 //          0 = Öffnen (Auf), 2 = Stop, 4 = Schließen (Zu)
 //  LEVEL : Integer 0..100 % (Position)
 //
-//  Wichtig (per Geraete-Log bestaetigt): der lokale Endpunkt akzeptiert
-//  Appliance.RollerShutter.Position mit SET (SETACK), waehrend
-//  Appliance.RollerShutter.State mit SET die Verbindung abbricht
-//  ("Empty reply"). Daher: Auf/Zu ueber Position (100/0), Stop ueber State-PUSH.
+//  WICHTIG (per meross_iot-Referenz bestaetigt): der Fahr-Befehl ist
+//  Appliance.RollerShutter.State mit method=SET und der Payload als
+//  OBJEKT  {"state":{"state":N,"channel":0}}  -- NICHT als Array.
+//    state 1 = Auf/Oeffnen, 2 = Zu/Schliessen, 0 = Stop
+//  Ebenso Position als Objekt  {"position":{"position":N,"channel":0}}.
+//  Die frueher gesehenen Array-PUSH-Meldungen waren nur Status-Meldungen
+//  des Geraets (kein Steuerbefehl) -- daher quittierte/abgelehnte SETs.
 //  Wird als Trait in die Klasse MerossDevice eingebunden.
 // ---------------------------------------------------------------------
 
@@ -29,26 +32,26 @@ trait RollerDevice
     {
         if ($Ident === 'MOVE') {
             $v = (int) $Value;
-            if ($v === 0) {            // Öffnen -> Position 100
-                $resp = $this->RollerSetPosition(100);
-                $this->RollerLog('Auf (Position=100)', 100, $resp);
+            if ($v === 0) {            // Öffnen (Auf)  -> State 1
+                $resp = $this->RollerSetState(1);
+                $this->RollerLog('Auf (State=1)', 1, $resp);
                 if ($resp !== null) {
                     $this->SetValue('MOVE', 0);
-                    $this->SetValue('LEVEL', 100);
                 }
-            } elseif ($v === 4) {      // Schließen -> Position 0
-                $resp = $this->RollerSetPosition(0);
-                $this->RollerLog('Zu (Position=0)', 0, $resp);
+            } elseif ($v === 4) {      // Schließen (Zu) -> State 2
+                $resp = $this->RollerSetState(2);
+                $this->RollerLog('Zu (State=2)', 2, $resp);
                 if ($resp !== null) {
                     $this->SetValue('MOVE', 4);
-                    $this->SetValue('LEVEL', 0);
                 }
-            } else {                   // Stop -> State 0 (Best effort)
-                $resp = $this->LocalRequest('Appliance.RollerShutter.State', 'PUSH', ['state' => [['state' => 0, 'channel' => 0]]]);
-                $this->RollerLog('Stop', 0, $resp);
-                $this->SetValue('MOVE', 2);
-                $this->RollerUpdate();
+            } else {                   // Stop -> State 0
+                $resp = $this->RollerSetState(0);
+                $this->RollerLog('Stop (State=0)', 0, $resp);
+                if ($resp !== null) {
+                    $this->SetValue('MOVE', 2);
+                }
             }
+            $this->RollerUpdate();
             return;
         }
 
@@ -63,9 +66,16 @@ trait RollerDevice
         }
     }
 
+    // Fahrbefehl: Objekt-Form (NICHT Array). state 1=Auf, 2=Zu, 0=Stop
+    private function RollerSetState(int $state)
+    {
+        return $this->LocalRequest('Appliance.RollerShutter.State', 'SET', ['state' => ['state' => $state, 'channel' => 0]]);
+    }
+
+    // Position anfahren: ebenfalls Objekt-Form (NICHT Array).
     private function RollerSetPosition(int $pos)
     {
-        return $this->LocalRequest('Appliance.RollerShutter.Position', 'SET', ['position' => [['position' => $pos, 'channel' => 0]]]);
+        return $this->LocalRequest('Appliance.RollerShutter.Position', 'SET', ['position' => ['position' => $pos, 'channel' => 0]]);
     }
 
     private function RollerUpdate()
