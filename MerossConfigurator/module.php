@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 // =====================================================================
 //  Meross Geräte aus Cloud hinzufügen  -  Konfigurator
-//  Zugangsdaten/Login EINMAL hier; listet die Konto-Geraete und legt
-//  per Klick Geraete-Instanzen an (Key/Name/Typ werden mitgegeben).
-//  Version 1.2.1 / Build 19
+//
+//  WICHTIG: Der Cloud-Login erfolgt AUSSCHLIESSLICH per Knopfdruck
+//  ("Geräte aus der Cloud laden"). Das Formular selbst greift NIE
+//  automatisch auf die Meross-Cloud zu (verhindert die zeitweise
+//  Konto-Sperre durch zu haeufige Anmeldungen). Die Geraeteliste wird
+//  nach dem Laden lokal in einem Attribut zwischengespeichert.
 // =====================================================================
 
 class MerossConfigurator extends IPSModule
@@ -22,6 +25,10 @@ class MerossConfigurator extends IPSModule
         $this->RegisterPropertyString('MFA', '');
         $this->RegisterPropertyString('ApiBase', 'https://iotx-eu.meross.com');
         $this->RegisterPropertyString('Key', '');
+
+        // Lokaler Zwischenspeicher der zuletzt geladenen Geraeteliste (JSON).
+        // So muss das Formular NIE selbst in die Cloud.
+        $this->RegisterAttributeString('DeviceCache', '');
     }
 
     public function Destroy()
@@ -32,6 +39,7 @@ class MerossConfigurator extends IPSModule
     public function ApplyChanges()
     {
         parent::ApplyChanges();
+        // Bewusst KEIN Cloud-Zugriff hier.
     }
 
     public function GetConfigurationForm()
@@ -52,69 +60,99 @@ class MerossConfigurator extends IPSModule
             'status'  => []
         ];
 
+        // Schritt-fuer-Schritt-Hinweis + Lade-Knopf (loest als EINZIGES den Cloud-Login aus)
+        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('1. Zugangsdaten eintragen und „Übernehmen" drücken.  2. Danach „Geräte aus der Cloud laden" drücken (nur dann erfolgt eine Anmeldung bei Meross).')];
+        $form['actions'][] = [
+            'type'    => 'Button',
+            'caption' => $this->Translate('Geräte aus der Cloud laden'),
+            'onClick' => 'MEROC_LoadDevices($id);'
+        ];
+        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Hinweis: Möglichst selten anmelden. Bei zu häufigen Anmeldungen sperrt Meross das Konto vorübergehend (ca. 5 Stunden).')];
+
+        // Geraeteliste NUR aus dem lokalen Cache aufbauen (kein Cloud-Zugriff)
+        $cache = json_decode($this->ReadAttributeString('DeviceCache'), true);
+        if (is_array($cache) && !empty($cache['devices'])) {
+            $injectKey = $this->ReadPropertyString('Key');
+            if ($injectKey === '') {
+                $injectKey = $cache['key'] ?? '';
+            }
+
+            $values = [];
+            foreach ($cache['devices'] as $d) {
+                $uuid = $d['uuid'] ?? '';
+                $name = $d['name'] ?? '?';
+                $raw  = strtolower($d['raw'] ?? '');
+                $values[] = [
+                    'name'       => $name,
+                    'typ'        => $raw,
+                    'uuid'       => $uuid,
+                    'instanceID' => $this->FindInstanceByUuid($uuid),
+                    'create'     => [
+                        'moduleID'      => self::DEVICE_MODULE_GUID,
+                        'configuration' => [
+                            'DeviceType' => $this->MapType($raw),
+                            'DeviceName' => $name,
+                            'Uuid'       => $uuid,
+                            'Key'        => $injectKey
+                        ]
+                    ]
+                ];
+            }
+
+            if (!empty($cache['ts'])) {
+                $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Zuletzt aus der Cloud geladen: ') . date('d.m.Y H:i', (int) $cache['ts'])];
+            }
+            $form['actions'][] = [
+                'type'     => 'Configurator',
+                'name'     => 'config',
+                'caption'  => $this->Translate('Geräte aus deinem Meross-Konto'),
+                'rowCount' => 20,
+                'add'      => false,
+                'delete'   => true,
+                'columns'  => [
+                    ['caption' => $this->Translate('Name'), 'name' => 'name', 'width' => '250px'],
+                    ['caption' => 'Typ', 'name' => 'typ', 'width' => '120px'],
+                    ['caption' => 'UUID', 'name' => 'uuid', 'width' => 'auto']
+                ],
+                'values'   => $values
+            ];
+            $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Nach dem Hinzufügen im Gerät die lokale IP eintragen. Tipp: feste IP in der Fritzbox vergeben, dann bleibt sie konstant.')];
+        } else {
+            $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Noch keine Geräte geladen. Oben auf „Geräte aus der Cloud laden" drücken.')];
+        }
+
+        return json_encode($form);
+    }
+
+    // EINZIGER Cloud-Zugriff: wird nur durch den Button ausgeloest.
+    public function LoadDevices()
+    {
         $email = $this->ReadPropertyString('Email');
         $pass  = $this->ReadPropertyString('Password');
-
         if ($email === '' || $pass === '') {
-            $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Zugangsdaten eintragen und „Übernehmen" drücken – danach erscheint hier die Geräteliste.')];
-            return json_encode($form);
+            echo $this->Translate('Bitte zuerst E-Mail und Passwort eintragen und „Übernehmen" drücken.');
+            return;
         }
 
         $key = '';
         $err = '';
         $devices = $this->CloudLoginAndList($email, $pass, $this->ReadPropertyString('MFA'), $this->ReadPropertyString('ApiBase'), $key, $err);
-
         if ($devices === null) {
-            $form['actions'][] = ['type' => 'Label', 'caption' => '⚠ ' . $err];
-            return json_encode($form);
+            echo '⚠ ' . $err;
+            return;
         }
 
-        // Gespeicherten Konto-Key bevorzugen, sonst den aus dem Login verwenden
-        $injectKey = $this->ReadPropertyString('Key');
-        if ($injectKey === '') {
-            $injectKey = $key;
-        }
-
-        $values = [];
+        $slim = [];
         foreach ($devices as $d) {
-            $uuid = $d['uuid'] ?? '';
-            $name = $d['devName'] ?? '?';
-            $raw  = strtolower($d['deviceType'] ?? '');
-            $type = $this->MapType($raw);
-            $values[] = [
-                'name'       => $name,
-                'typ'        => $raw,
-                'uuid'       => $uuid,
-                'instanceID' => $this->FindInstanceByUuid($uuid),
-                'create'     => [
-                    'moduleID'      => self::DEVICE_MODULE_GUID,
-                    'configuration' => [
-                        'DeviceType' => $type,
-                        'DeviceName' => $name,
-                        'Uuid'       => $uuid,
-                        'Key'        => $injectKey
-                    ]
-                ]
+            $slim[] = [
+                'name' => $d['devName'] ?? '?',
+                'raw'  => strtolower($d['deviceType'] ?? ''),
+                'uuid' => $d['uuid'] ?? ''
             ];
         }
-
-        $form['actions'][] = [
-            'type'     => 'Configurator',
-            'name'     => 'config',
-            'caption'  => $this->Translate('Geräte aus deinem Meross-Konto'),
-            'rowCount' => 20,
-            'add'      => false,
-            'delete'   => true,
-            'columns'  => [
-                ['caption' => $this->Translate('Name'), 'name' => 'name', 'width' => '250px'],
-                ['caption' => 'Typ', 'name' => 'typ', 'width' => '120px'],
-                ['caption' => 'UUID', 'name' => 'uuid', 'width' => 'auto']
-            ],
-            'values'   => $values
-        ];
-        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Nach dem Hinzufügen im Gerät die lokale IP eintragen. Tipp: feste IP in der Fritzbox vergeben, dann bleibt sie konstant.')];
-
-        return json_encode($form);
+        $this->WriteAttributeString('DeviceCache', json_encode(['key' => $key, 'devices' => $slim, 'ts' => time()]));
+        echo $this->Translate('Geräte geladen: ') . count($slim);
+        $this->ReloadForm();
     }
 
     private function MapType(string $t): string
