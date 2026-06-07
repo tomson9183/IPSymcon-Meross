@@ -37,16 +37,6 @@
             "type": "Button",
             "caption": "Status jetzt abrufen",
             "onClick": "MERO_Update($id);"
-        },
-        {
-            "type": "Button",
-            "caption": "Geräte-Fähigkeiten lokal auslesen (für Diagnose)",
-            "onClick": "MERO_Abilities($id);"
-        },
-        {
-            "type": "Button",
-            "caption": "Rollladen-Konfiguration / Kalibrierung auslesen (Diagnose)",
-            "onClick": "MERO_RollerConfig($id);"
         }
     ],
     "status": [
