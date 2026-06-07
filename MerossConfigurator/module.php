@@ -5,11 +5,10 @@ declare(strict_types=1);
 // =====================================================================
 //  Meross Geräte aus Cloud hinzufügen  -  Konfigurator
 //
-//  WICHTIG: Der Cloud-Login erfolgt AUSSCHLIESSLICH per Knopfdruck
-//  ("Geräte aus der Cloud laden"). Das Formular selbst greift NIE
-//  automatisch auf die Meross-Cloud zu (verhindert die zeitweise
-//  Konto-Sperre durch zu haeufige Anmeldungen). Die Geraeteliste wird
-//  nach dem Laden lokal in einem Attribut zwischengespeichert.
+//  - Cloud-Login NUR per Knopfdruck ("Geräte aus der Cloud laden").
+//    Holt Konto-Key + Geräteliste, speichert lokal im Attribut.
+//  - "Lokale IPs suchen": durchsucht das angegebene Subnetz und ordnet
+//    jedem Gerät anhand seiner UUID die lokale IP zu (kein Cloud-Zugriff).
 // =====================================================================
 
 class MerossConfigurator extends IPSModule
@@ -25,9 +24,9 @@ class MerossConfigurator extends IPSModule
         $this->RegisterPropertyString('MFA', '');
         $this->RegisterPropertyString('ApiBase', 'https://iotx-eu.meross.com');
         $this->RegisterPropertyString('Key', '');
+        $this->RegisterPropertyString('Subnet', '');
 
-        // Lokaler Zwischenspeicher der zuletzt geladenen Geraeteliste (JSON).
-        // So muss das Formular NIE selbst in die Cloud.
+        // Lokaler Zwischenspeicher: Key, Geraeteliste, IP-Zuordnung (JSON)
         $this->RegisterAttributeString('DeviceCache', '');
     }
 
@@ -44,6 +43,9 @@ class MerossConfigurator extends IPSModule
 
     public function GetConfigurationForm()
     {
+        $cache = json_decode($this->ReadAttributeString('DeviceCache'), true);
+        $ipmap = (is_array($cache) && isset($cache['ipmap']) && is_array($cache['ipmap'])) ? $cache['ipmap'] : [];
+
         $form = [
             'elements' => [
                 ['type' => 'ValidationTextBox', 'name' => 'Email', 'caption' => 'Meross E-Mail'],
@@ -54,23 +56,26 @@ class MerossConfigurator extends IPSModule
                     ['caption' => 'USA', 'value' => 'https://iotx-us.meross.com'],
                     ['caption' => 'Asien / Pazifik', 'value' => 'https://iotx-ap.meross.com']
                 ]],
-                ['type' => 'PasswordTextBox', 'name' => 'Key', 'caption' => 'Konto-Key (wird auf alle Geräte übertragen; leer = automatisch aus dem Login)']
+                ['type' => 'PasswordTextBox', 'name' => 'Key', 'caption' => 'Konto-Key (wird beim Laden automatisch geholt; manuell nur falls gewünscht)'],
+                ['type' => 'ValidationTextBox', 'name' => 'Subnet', 'caption' => 'Subnetz für IP-Suche, z. B. 192.168.178 (leer = automatisch)']
             ],
             'actions' => [],
             'status'  => []
         ];
 
-        // Schritt-fuer-Schritt-Hinweis + Lade-Knopf (loest als EINZIGES den Cloud-Login aus)
-        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('1. Zugangsdaten eintragen und „Übernehmen" drücken.  2. Danach „Geräte aus der Cloud laden" drücken (nur dann erfolgt eine Anmeldung bei Meross).')];
+        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('1. Zugangsdaten eintragen und „Übernehmen" drücken.  2. „Geräte aus der Cloud laden" (nur dann erfolgt eine Anmeldung bei Meross).  3. Optional „Lokale IPs suchen".')];
         $form['actions'][] = [
             'type'    => 'Button',
             'caption' => $this->Translate('Geräte aus der Cloud laden'),
             'onClick' => 'MEROC_LoadDevices($id);'
         ];
-        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Hinweis: Möglichst selten anmelden. Bei zu häufigen Anmeldungen sperrt Meross das Konto vorübergehend (ca. 5 Stunden).')];
+        $form['actions'][] = [
+            'type'    => 'Button',
+            'caption' => $this->Translate('Lokale IPs suchen (im Netzwerk, ohne Cloud)'),
+            'onClick' => 'MEROC_ScanLocalIPs($id);'
+        ];
+        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Hinweis: Möglichst selten in der Cloud anmelden. Bei zu häufigen Anmeldungen sperrt Meross das Konto vorübergehend (ca. 5 Stunden). Die IP-Suche läuft rein lokal.')];
 
-        // Geraeteliste NUR aus dem lokalen Cache aufbauen (kein Cloud-Zugriff)
-        $cache = json_decode($this->ReadAttributeString('DeviceCache'), true);
         if (is_array($cache) && !empty($cache['devices'])) {
             $injectKey = $this->ReadPropertyString('Key');
             if ($injectKey === '') {
@@ -82,19 +87,27 @@ class MerossConfigurator extends IPSModule
                 $uuid = $d['uuid'] ?? '';
                 $name = $d['name'] ?? '?';
                 $raw  = strtolower($d['raw'] ?? '');
+                $ip   = $ipmap[$uuid] ?? '';
+
+                $configuration = [
+                    'DeviceType' => $this->MapType($raw),
+                    'DeviceName' => $name,
+                    'Uuid'       => $uuid,
+                    'Key'        => $injectKey
+                ];
+                if ($ip !== '') {
+                    $configuration['Host'] = $ip;
+                }
+
                 $values[] = [
                     'name'       => $name,
                     'typ'        => $raw,
+                    'ip'         => $ip,
                     'uuid'       => $uuid,
                     'instanceID' => $this->FindInstanceByUuid($uuid),
                     'create'     => [
                         'moduleID'      => self::DEVICE_MODULE_GUID,
-                        'configuration' => [
-                            'DeviceType' => $this->MapType($raw),
-                            'DeviceName' => $name,
-                            'Uuid'       => $uuid,
-                            'Key'        => $injectKey
-                        ]
+                        'configuration' => $configuration
                     ]
                 ];
             }
@@ -110,13 +123,14 @@ class MerossConfigurator extends IPSModule
                 'add'      => false,
                 'delete'   => true,
                 'columns'  => [
-                    ['caption' => $this->Translate('Name'), 'name' => 'name', 'width' => '250px'],
-                    ['caption' => 'Typ', 'name' => 'typ', 'width' => '120px'],
+                    ['caption' => $this->Translate('Name'), 'name' => 'name', 'width' => '220px'],
+                    ['caption' => 'Typ', 'name' => 'typ', 'width' => '110px'],
+                    ['caption' => $this->Translate('Lokale IP'), 'name' => 'ip', 'width' => '130px'],
                     ['caption' => 'UUID', 'name' => 'uuid', 'width' => 'auto']
                 ],
                 'values'   => $values
             ];
-            $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Nach dem Hinzufügen im Gerät die lokale IP eintragen. Tipp: feste IP in der Fritzbox vergeben, dann bleibt sie konstant.')];
+            $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Wird keine IP gefunden: feste IP in der Fritzbox vergeben und im Gerät eintragen.')];
         } else {
             $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Noch keine Geräte geladen. Oben auf „Geräte aus der Cloud laden" drücken.')];
         }
@@ -124,7 +138,7 @@ class MerossConfigurator extends IPSModule
         return json_encode($form);
     }
 
-    // EINZIGER Cloud-Zugriff: wird nur durch den Button ausgeloest.
+    // EINZIGER Cloud-Zugriff: nur durch den Button ausgeloest.
     public function LoadDevices()
     {
         $email = $this->ReadPropertyString('Email');
@@ -150,9 +164,121 @@ class MerossConfigurator extends IPSModule
                 'uuid' => $d['uuid'] ?? ''
             ];
         }
-        $this->WriteAttributeString('DeviceCache', json_encode(['key' => $key, 'devices' => $slim, 'ts' => time()]));
+
+        // bestehende IP-Zuordnung beibehalten
+        $old   = json_decode($this->ReadAttributeString('DeviceCache'), true);
+        $ipmap = (is_array($old) && isset($old['ipmap'])) ? $old['ipmap'] : [];
+
+        $this->WriteAttributeString('DeviceCache', json_encode(['key' => $key, 'devices' => $slim, 'ipmap' => $ipmap, 'ts' => time()]));
+
+        // Key sichtbar machen, falls nicht manuell gesetzt
+        if ($this->ReadPropertyString('Key') === '' && $key !== '') {
+            $this->UpdateFormField('Key', 'value', $key);
+        }
+
         echo $this->Translate('Geräte geladen: ') . count($slim);
         $this->ReloadForm();
+    }
+
+    // Lokale IP-Suche per UUID-Abgleich (rein lokal, kein Cloud-Zugriff).
+    public function ScanLocalIPs()
+    {
+        $cache = json_decode($this->ReadAttributeString('DeviceCache'), true);
+        if (!is_array($cache) || empty($cache['devices'])) {
+            echo $this->Translate('Bitte zuerst „Geräte aus der Cloud laden".');
+            return;
+        }
+        $key = $this->ReadPropertyString('Key');
+        if ($key === '') {
+            $key = $cache['key'] ?? '';
+        }
+        if ($key === '') {
+            echo $this->Translate('Kein Konto-Key vorhanden. Erst Geräte aus der Cloud laden.');
+            return;
+        }
+
+        $base = trim($this->ReadPropertyString('Subnet'));
+        if ($base === '') {
+            $base = $this->GuessSubnet();
+        }
+        $base = rtrim($base, '.');
+        if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}$/', $base)) {
+            echo $this->Translate('Subnetz ungültig. Beispiel: 192.168.178');
+            return;
+        }
+
+        $mh = curl_multi_init();
+        $handles = [];
+        for ($i = 1; $i <= 254; $i++) {
+            $ip   = "$base.$i";
+            $ts   = time();
+            $mid  = md5(uniqid('', true));
+            $sign = md5($mid . $key . $ts);
+            $body = json_encode([
+                'header'  => [
+                    'messageId'      => $mid,
+                    'namespace'      => 'Appliance.System.All',
+                    'method'         => 'GET',
+                    'payloadVersion' => 1,
+                    'from'           => "http://$ip/config",
+                    'timestamp'      => $ts,
+                    'timestampMs'    => 0,
+                    'sign'           => $sign
+                ],
+                'payload' => new stdClass()
+            ]);
+            $ch = curl_init("http://$ip/config");
+            curl_setopt_array($ch, [
+                CURLOPT_POST              => true,
+                CURLOPT_POSTFIELDS        => $body,
+                CURLOPT_HTTPHEADER        => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER    => true,
+                CURLOPT_CONNECTTIMEOUT_MS => 500,
+                CURLOPT_TIMEOUT_MS        => 1500
+            ]);
+            curl_multi_add_handle($mh, $ch);
+            $handles[$ip] = $ch;
+        }
+
+        do {
+            $status = curl_multi_exec($mh, $active);
+            if ($active) {
+                curl_multi_select($mh, 0.2);
+            }
+        } while ($active && $status == CURLM_OK);
+
+        $ipmap = [];
+        foreach ($handles as $ip => $ch) {
+            $res = curl_multi_getcontent($ch);
+            if (is_string($res) && $res !== '') {
+                $d = json_decode($res, true);
+                if (is_array($d)) {
+                    $uuid = $d['header']['uuid'] ?? ($d['payload']['all']['system']['hardware']['uuid'] ?? '');
+                    if ($uuid !== '') {
+                        $ipmap[$uuid] = $ip;
+                    }
+                }
+            }
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($mh);
+
+        $cache['ipmap'] = $ipmap;
+        $this->WriteAttributeString('DeviceCache', json_encode($cache));
+        echo $this->Translate('Im Netz gefundene Meross-Geräte: ') . count($ipmap);
+        $this->ReloadForm();
+    }
+
+    private function GuessSubnet(): string
+    {
+        foreach (IPS_GetInstanceListByModuleID(self::DEVICE_MODULE_GUID) as $iid) {
+            $h = @IPS_GetProperty($iid, 'Host');
+            if (is_string($h) && preg_match('/^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/', $h, $m)) {
+                return $m[1];
+            }
+        }
+        return '192.168.178';
     }
 
     private function MapType(string $t): string
