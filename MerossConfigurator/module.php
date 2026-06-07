@@ -63,7 +63,7 @@ class MerossConfigurator extends IPSModule
             'status'  => []
         ];
 
-        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('1. Zugangsdaten eintragen und „Übernehmen" drücken.  2. „Geräte aus der Cloud laden" (nur dann erfolgt eine Anmeldung bei Meross).  3. Optional „Lokale IPs suchen".')];
+        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('1. Zugangsdaten eintragen und „Übernehmen" drücken.  2. „Geräte aus der Cloud laden" – holt Konto-Key + Geräteliste und sucht automatisch die lokalen IPs.')];
         $form['actions'][] = [
             'type'    => 'Button',
             'caption' => $this->Translate('Geräte aus der Cloud laden'),
@@ -71,7 +71,7 @@ class MerossConfigurator extends IPSModule
         ];
         $form['actions'][] = [
             'type'    => 'Button',
-            'caption' => $this->Translate('Lokale IPs suchen (im Netzwerk, ohne Cloud)'),
+            'caption' => $this->Translate('Lokale IPs erneut suchen (falls sich eine IP geändert hat)'),
             'onClick' => 'MEROC_ScanLocalIPs($id);'
         ];
         $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Hinweis: Möglichst selten in der Cloud anmelden. Bei zu häufigen Anmeldungen sperrt Meross das Konto vorübergehend (ca. 5 Stunden). Die IP-Suche läuft rein lokal.')];
@@ -165,9 +165,16 @@ class MerossConfigurator extends IPSModule
             ];
         }
 
-        // bestehende IP-Zuordnung beibehalten
-        $old   = json_decode($this->ReadAttributeString('DeviceCache'), true);
-        $ipmap = (is_array($old) && isset($old['ipmap'])) ? $old['ipmap'] : [];
+        // Direkt im Anschluss die lokalen IPs ermitteln (rein lokal, ohne Cloud)
+        $base  = trim($this->ReadPropertyString('Subnet'));
+        if ($base === '') {
+            $base = $this->GuessSubnet();
+        }
+        $base  = rtrim($base, '.');
+        $ipmap = [];
+        if ($key !== '' && preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}$/', $base)) {
+            $ipmap = $this->DoLocalScan($base, $key);
+        }
 
         $this->WriteAttributeString('DeviceCache', json_encode(['key' => $key, 'devices' => $slim, 'ipmap' => $ipmap, 'ts' => time()]));
 
@@ -176,7 +183,7 @@ class MerossConfigurator extends IPSModule
             $this->UpdateFormField('Key', 'value', $key);
         }
 
-        echo $this->Translate('Geräte geladen: ') . count($slim);
+        echo $this->Translate('Geräte geladen: ') . count($slim) . $this->Translate('  |  lokale IPs gefunden: ') . count($ipmap);
         $this->ReloadForm();
     }
 
@@ -207,6 +214,16 @@ class MerossConfigurator extends IPSModule
             return;
         }
 
+        $ipmap          = $this->DoLocalScan($base, $key);
+        $cache['ipmap'] = $ipmap;
+        $this->WriteAttributeString('DeviceCache', json_encode($cache));
+        echo $this->Translate('Im Netz gefundene Meross-Geräte: ') . count($ipmap);
+        $this->ReloadForm();
+    }
+
+    // Fuehrt den eigentlichen Subnetz-Scan aus und liefert uuid => ip
+    private function DoLocalScan(string $base, string $key): array
+    {
         $mh = curl_multi_init();
         $handles = [];
         for ($i = 1; $i <= 254; $i++) {
@@ -264,10 +281,7 @@ class MerossConfigurator extends IPSModule
         }
         curl_multi_close($mh);
 
-        $cache['ipmap'] = $ipmap;
-        $this->WriteAttributeString('DeviceCache', json_encode($cache));
-        echo $this->Translate('Im Netz gefundene Meross-Geräte: ') . count($ipmap);
-        $this->ReloadForm();
+        return $ipmap;
     }
 
     private function GuessSubnet(): string
