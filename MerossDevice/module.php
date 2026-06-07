@@ -30,11 +30,13 @@ class MerossDevice extends IPSModule
 
         $this->RegisterAttributeBoolean('LastLed', true);
 
-        // Rollladen: sanfter Positions-Mitlauf waehrend der Fahrt
-        $this->RegisterAttributeInteger('FollowTo', 0);
-        $this->RegisterAttributeInteger('FollowStep', 0);
+        // Rollladen: zeitbasierter Positions-Mitlauf + praeziser Stop
         $this->RegisterAttributeInteger('FollowUntil', 0);
         $this->RegisterAttributeInteger('FollowSeconds', 22);
+        $this->RegisterAttributeInteger('MoveFrom', 0);
+        $this->RegisterAttributeInteger('MoveTo', 0);
+        $this->RegisterAttributeInteger('MoveDurMs', 0);
+        $this->RegisterAttributeString('MoveStart', '0');
 
         $this->RegisterTimer('MERO_Poll', 0, 'MERO_Update($_IPS[\'TARGET\']);');
         $this->RegisterTimer('MERO_RollerFollow', 0, 'MERO_RollerFollowTick($_IPS[\'TARGET\']);');

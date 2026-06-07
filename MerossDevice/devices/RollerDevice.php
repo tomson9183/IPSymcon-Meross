@@ -8,17 +8,21 @@ declare(strict_types=1);
 //  Fahren (am Geraet verifiziert):
 //   * Appliance.RollerShutter.Position [SET] mit OBJEKT-Payload
 //     {"position":{"position":N,"channel":0}}  (N=0..100, 100=auf, 0=zu)
-//   * State [SET] faehrt auf diesem Geraet NICHT -> Auf/Zu via Position.
+//   * State [SET] faehrt/stoppt auf diesem Geraet NICHT.
 //
 //  Darstellung:
 //   * MOVE  : Aufzaehlung, LAYOUT=1 (Reihe) -> Buttons NEBENEINANDER
 //             Werte: 0=Auf, 1=Stop, 2=Zu
 //   * LEVEL : Positions-Schieberegler 0..100 %
 //
-//  Sanfter Mitlauf:
-//   * Auf/Zu lassen LEVEL ueber die bekannte Fahrzeit hochlaufen.
+//  Mitlauf + Stop (zeitbasiert):
+//   * Beim Fahren werden Start (MoveStart), Start/Zielposition und
+//     Fahrdauer (MoveDurMs) gemerkt. Die Anzeige laeuft daraus glatt mit.
+//   * Stop: die exakte Ist-Position wird aus der verstrichenen Zeit
+//     berechnet (kein 1-s-Raster mehr) und mit kleinem Vorhalt in
+//     Fahrtrichtung angefahren -> haelt praktisch sofort, kein Ruecklauf.
 //   * Waehrend der Fahrt (FollowUntil) ueberschreibt das Polling die
-//     Anzeige NICHT (verhindert das Zurueckspringen).
+//     Anzeige nicht.
 //
 //  Wird als Trait in die Klasse MerossDevice eingebunden.
 // ---------------------------------------------------------------------
@@ -47,7 +51,7 @@ trait RollerDevice
         // Fahrzeit aus der Geraete-Konfiguration uebernehmen (lokal, keine Cloud)
         $cfg = $this->LocalRequest('Appliance.RollerShutter.Config', 'GET', []);
         if ($cfg !== null) {
-            $c = $cfg['payload']['config'][0] ?? [];
+            $c     = $cfg['payload']['config'][0] ?? [];
             $open  = (int) ($c['signalOpen'] ?? 0);
             $close = (int) ($c['signalClose'] ?? 0);
             $ms    = max($open, $close);
@@ -66,26 +70,17 @@ trait RollerDevice
                 $this->RollerLog('Auf (Position=100)', 100, $resp);
                 if ($resp !== null) {
                     $this->SetValue('MOVE', 0);
-                    $this->RollerStartFollow(100);
+                    $this->RollerStartMove(100, true);
                 }
             } elseif ($v === 2) {      // Zu   -> Position 0
                 $resp = $this->RollerSetPosition(0);
                 $this->RollerLog('Zu (Position=0)', 0, $resp);
                 if ($resp !== null) {
                     $this->SetValue('MOVE', 2);
-                    $this->RollerStartFollow(0);
+                    $this->RollerStartMove(0, true);
                 }
-            } else {                   // Stop -> aktuelle Position anfahren = anhalten
-                $this->RollerStopFollow();
-                $cur  = (int) $this->GetValue('LEVEL');
-                $resp = $this->RollerSetPosition($cur);
-                $this->RollerLog("Stop (Position=$cur)", $cur, $resp);
-                if ($resp !== null) {
-                    $this->SetValue('MOVE', 1);
-                }
-                $this->SetValue('LEVEL', $cur);
-                // kurz nicht ueberschreiben, dann echte Position bestaetigen
-                $this->WriteAttributeInteger('FollowUntil', time() + 3);
+            } else {                   // Stop -> exakte Ist-Position anfahren
+                $this->RollerStop();
             }
             return;
         }
@@ -95,70 +90,104 @@ trait RollerDevice
             $resp = $this->RollerSetPosition($pos);
             $this->RollerLog('Position', $pos, $resp);
             if ($resp !== null) {
-                // Vom Nutzer gesetzte Zielposition direkt uebernehmen (kein Ruecksprung).
+                // Zielposition des Sliders sofort uebernehmen (kein Ruecksprung),
+                // Tracking fuer einen evtl. spaeteren Stop mitfuehren, aber NICHT animieren.
+                $this->RollerStartMove($pos, false);
                 $this->SetValue('LEVEL', $pos);
-                // Waehrend der Fahrt das Polling die Anzeige nicht ueberschreiben lassen.
-                $this->WriteAttributeInteger('FollowStep', 0);
-                $this->SetTimerInterval('MERO_RollerFollow', 0);
-                $secs = max(2, (int) $this->ReadAttributeInteger('FollowSeconds'));
-                $this->WriteAttributeInteger('FollowUntil', time() + $secs + 3);
             }
             return;
         }
     }
 
-    // Startet den sanften Mitlauf der LEVEL-Anzeige von der aktuellen
-    // Position zur Zielposition ueber die bekannte Fahrzeit.
-    private function RollerStartFollow(int $target)
+    // Merkt Start/Ziel/Dauer fuer Mitlauf + Stop. $animate=true startet den
+    // gleichmaessigen Anzeige-Mitlauf (Buttons). Bei false (Slider) zeigt die
+    // Anzeige direkt das Ziel, das Tracking dient nur dem praezisen Stop.
+    private function RollerStartMove(int $target, bool $animate)
     {
         $target = max(0, min(100, $target));
-        $cur    = (int) $this->GetValue('LEVEL');
+        $from   = (int) $this->GetValue('LEVEL');
         $secs   = max(2, (int) $this->ReadAttributeInteger('FollowSeconds'));
-        // Anzeige soll waehrend der gesamten Fahrt nicht vom Polling ueberschrieben werden
-        $this->WriteAttributeInteger('FollowUntil', time() + $secs + 3);
+        $durMs  = (int) round($secs * 1000 * abs($target - $from) / 100);
 
-        if ($cur === $target) {
-            $this->WriteAttributeInteger('FollowStep', 0);
+        $this->WriteAttributeInteger('MoveFrom', $from);
+        $this->WriteAttributeInteger('MoveTo', $target);
+        $this->WriteAttributeInteger('MoveDurMs', $durMs);
+        $this->WriteAttributeString('MoveStart', (string) microtime(true));
+
+        // Polling soll die Anzeige bis Fahrtende + Puffer nicht ueberschreiben
+        $this->WriteAttributeInteger('FollowUntil', time() + (int) ceil($durMs / 1000) + 3);
+
+        if ($animate && $durMs > 0 && $from !== $target) {
+            $this->SetTimerInterval('MERO_RollerFollow', 300);
+        } else {
             $this->SetTimerInterval('MERO_RollerFollow', 0);
-            return;
         }
-        $step = (int) max(1, (int) round(100 / $secs)); // % pro Sekunde
-        if ($target < $cur) {
-            $step = -$step;
-        }
-        $this->WriteAttributeInteger('FollowTo', $target);
-        $this->WriteAttributeInteger('FollowStep', $step);
-        $this->SetTimerInterval('MERO_RollerFollow', 1000); // 1-Sekunden-Schritte
     }
 
-    private function RollerStopFollow()
+    // Praeziser Stop: Ist-Position aus verstrichener Zeit berechnen und mit
+    // kleinem Vorhalt in Fahrtrichtung anfahren (kein Ruecklauf).
+    private function RollerStop()
     {
-        $this->WriteAttributeInteger('FollowStep', 0);
-        $this->WriteAttributeInteger('FollowUntil', 0);
+        $from = (int) $this->ReadAttributeInteger('MoveFrom');
+        $to   = (int) $this->ReadAttributeInteger('MoveTo');
+        $dir  = ($to > $from) ? 1 : (($to < $from) ? -1 : 0);
+
+        $est  = $this->RollerEstimatePosition();
+        $stop = max(0, min(100, $est + (2 * $dir))); // ~2% Vorhalt gleicht die Befehlslaufzeit aus
+
+        $resp = $this->RollerSetPosition($stop);
+        $this->RollerLog("Stop (Position=$stop, Ist~$est)", $stop, $resp);
+        if ($resp !== null) {
+            $this->SetValue('MOVE', 1);
+        }
+
+        // Mitlauf beenden, Anzeige auf den berechneten Ist-Wert setzen
         $this->SetTimerInterval('MERO_RollerFollow', 0);
+        $this->WriteAttributeInteger('MoveDurMs', 0);
+        $this->SetValue('LEVEL', $est);
+        // kurz nicht ueberschreiben, dann echte Position bestaetigen
+        $this->WriteAttributeInteger('FollowUntil', time() + 3);
     }
 
-    // Timer-Tick: schiebt LEVEL einen Schritt Richtung Ziel
+    // Zeitbasierte Schaetzung der aktuellen Position waehrend einer Fahrt
+    private function RollerEstimatePosition(): int
+    {
+        $durMs = (int) $this->ReadAttributeInteger('MoveDurMs');
+        $from  = (int) $this->ReadAttributeInteger('MoveFrom');
+        $to    = (int) $this->ReadAttributeInteger('MoveTo');
+        $start = (float) $this->ReadAttributeString('MoveStart');
+        if ($durMs <= 0 || $start <= 0.0) {
+            return (int) $this->GetValue('LEVEL');
+        }
+        $elapsedMs = (microtime(true) - $start) * 1000.0;
+        if ($elapsedMs < 0) {
+            $elapsedMs = 0;
+        }
+        $frac = $elapsedMs / $durMs;
+        if ($frac > 1) {
+            $frac = 1;
+        }
+        return (int) round($from + ($to - $from) * $frac);
+    }
+
+    // Timer-Tick: Anzeige gleichmaessig zur Zielposition fuehren
     private function RollerFollow()
     {
-        $step = (int) $this->ReadAttributeInteger('FollowStep');
-        if ($step === 0) {
+        $durMs = (int) $this->ReadAttributeInteger('MoveDurMs');
+        if ($durMs <= 0) {
             $this->SetTimerInterval('MERO_RollerFollow', 0);
             return;
         }
-        $to  = (int) $this->ReadAttributeInteger('FollowTo');
-        $cur = (int) $this->GetValue('LEVEL') + $step;
+        $start = (float) $this->ReadAttributeString('MoveStart');
+        $elapsedMs = (microtime(true) - $start) * 1000.0;
+        $done = ($elapsedMs >= $durMs);
 
-        $done = ($step > 0 && $cur >= $to) || ($step < 0 && $cur <= $to);
-        if ($done) {
-            $cur = $to;
-            $this->WriteAttributeInteger('FollowStep', 0);
-            $this->SetTimerInterval('MERO_RollerFollow', 0);
-        }
+        $cur = $this->RollerEstimatePosition();
         $this->SetValue('LEVEL', max(0, min(100, $cur)));
 
         if ($done) {
-            // Kurz nachlaufen lassen, dann echte Position bestaetigen
+            $this->SetTimerInterval('MERO_RollerFollow', 0);
+            $this->WriteAttributeInteger('MoveDurMs', 0);
             $this->WriteAttributeInteger('FollowUntil', time() + 2);
         }
     }
