@@ -11,11 +11,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/devices/PlugDevice.php';
 require_once __DIR__ . '/devices/RollerDevice.php';
+require_once __DIR__ . '/devices/Light_MSL_MSS560.php';
+require_once __DIR__ . '/devices/Garage_MSG100_MSG200.php';
+require_once __DIR__ . '/devices/Hub_MSH300.php';
+require_once __DIR__ . '/devices/Thermostat_MTS200_MTS215B_MTS960.php';
 
 class MerossDevice extends IPSModule
 {
-    use PlugDevice;    // Steckdosen (MSS210P / MSS620)
+    use PlugDevice;    // Steckdosen / Schalter (MSS210P / MSS620 / weitere)
     use RollerDevice;  // Rollladen (MRS100)
+    use LightDevice;   // Lampe / Dimmer / LED (MSL-Serie, MSS560)
+    use GarageDevice;  // Garagentoröffner (MSG100 / MSG200)
+    use HubDevice;     // Hub MSH300 mit Sensoren / Thermostat-Ventilen
+    use ThermostatDevice; // WLAN-Thermostate (MTS200 / MTS215B / MTS960)
 
     public function Create()
     {
@@ -38,6 +46,10 @@ class MerossDevice extends IPSModule
         $this->RegisterAttributeInteger('MoveDurMs', 0);
         $this->RegisterAttributeString('MoveStart', '0');
 
+        // Eigenständige WLAN-Thermostate: erkannte Variante/Skalierung merken
+        $this->RegisterAttributeString('ThermoVariant', '');
+        $this->RegisterAttributeInteger('ThermoScale', 10);
+
         $this->RegisterTimer('MERO_Poll', 0, 'MERO_Update($_IPS[\'TARGET\']);');
         $this->RegisterTimer('MERO_RollerFollow', 0, 'MERO_RollerFollowTick($_IPS[\'TARGET\']);');
     }
@@ -56,10 +68,13 @@ class MerossDevice extends IPSModule
 
         $type = $this->ReadPropertyString('DeviceType');
         $this->CleanupForeignVars($type);
-        if ($type === 'mrs100') {
-            $this->RollerApplyChanges();
-        } else {
-            $this->PlugApplyChanges();
+        switch ($this->TypeGroup($type)) {
+            case 'roller': $this->RollerApplyChanges(); break;
+            case 'light':  $this->LightApplyChanges();  break;
+            case 'garage': $this->GarageApplyChanges(); break;
+            case 'hub':    $this->HubApplyChanges();    break;
+            case 'thermostat': $this->ThermoApplyChanges(); break;
+            default:       $this->PlugApplyChanges();   break;
         }
 
         // Name aus der Cloud uebernehmen (vom Konfigurator gesetzt)
@@ -83,22 +98,47 @@ class MerossDevice extends IPSModule
 
     public function RequestAction($Ident, $Value)
     {
-        $type = $this->ReadPropertyString('DeviceType');
-        if ($type === 'mrs100') {
-            $this->RollerRequestAction($Ident, $Value);
-        } else {
-            $this->PlugRequestAction($Ident, $Value);
+        switch ($this->TypeGroup($this->ReadPropertyString('DeviceType'))) {
+            case 'roller': $this->RollerRequestAction($Ident, $Value); break;
+            case 'light':  $this->LightRequestAction($Ident, $Value);  break;
+            case 'garage': $this->GarageRequestAction($Ident, $Value); break;
+            case 'hub':    $this->HubRequestAction($Ident, $Value);    break;
+            case 'thermostat': $this->ThermoRequestAction($Ident, $Value); break;
+            default:       $this->PlugRequestAction($Ident, $Value);   break;
         }
     }
 
     public function Update()
     {
-        $type = $this->ReadPropertyString('DeviceType');
-        if ($type === 'mrs100') {
-            $this->RollerUpdate();
-        } else {
-            $this->PlugUpdate();
+        switch ($this->TypeGroup($this->ReadPropertyString('DeviceType'))) {
+            case 'roller': $this->RollerUpdate(); break;
+            case 'light':  $this->LightUpdate();  break;
+            case 'garage': $this->GarageUpdate(); break;
+            case 'hub':    $this->HubUpdate();    break;
+            case 'thermostat': $this->ThermoUpdate(); break;
+            default:       $this->PlugUpdate();   break;
         }
+    }
+
+    // Ordnet die (vielen) Geraetetypen einer Steuer-Gruppe zu
+    private function TypeGroup(string $type): string
+    {
+        if ($type === 'mrs100') {
+            return 'roller';
+        }
+        if ($type === 'light') {
+            return 'light';
+        }
+        if ($type === 'garage') {
+            return 'garage';
+        }
+        if ($type === 'hub') {
+            return 'hub';
+        }
+        if ($type === 'thermostat') {
+            return 'thermostat';
+        }
+        return 'plug'; // mss210p, mss620 und weitere Schalter/Steckdosen
     }
 
     // Timer-Callback fuer den sanften Positions-Mitlauf (nur Rollladen)
@@ -127,15 +167,18 @@ class MerossDevice extends IPSModule
     // =================================================================
 
     // Variablen entfernen, die nicht zum aktuellen Geraetetyp gehoeren
-    // (z.B. uebrig gebliebene Steckdosen-Variable in einem Rollladen)
+    // (z.B. uebrig gebliebene Steckdosen-Variable nach einem Typwechsel)
     private function CleanupForeignVars(string $type)
     {
-        if ($type === 'mrs100') {
-            $remove = ['STATE0', 'STATE1', 'STATE2', 'STATE3', 'POWER', 'VOLTAGE', 'CURRENT', 'ENERGY_TODAY'];
-        } else {
-            $remove = ['MOVE', 'LEVEL', 'CONTROL', 'POSITION'];
-        }
-        foreach ($remove as $id) {
+        $sets = [
+            'plug'   => ['STATE0', 'STATE1', 'STATE2', 'STATE3', 'STATE4', 'STATE5', 'POWER', 'VOLTAGE', 'CURRENT', 'ENERGY_TODAY'],
+            'roller' => ['MOVE', 'LEVEL'],
+            'light'  => ['STATE', 'BRIGHT', 'COLOR', 'CTEMP'],
+            'garage' => ['DOOR'],
+        ];
+        $keep = $sets[$this->TypeGroup($type)] ?? $sets['plug'];
+        $all  = array_merge($sets['plug'], $sets['roller'], $sets['light'], $sets['garage']);
+        foreach (array_diff($all, $keep) as $id) {
             if (@$this->GetIDForIdent($id) !== false) {
                 $this->UnregisterVariable($id);
             }
@@ -215,6 +258,17 @@ class MerossDevice extends IPSModule
         return is_array($decoded) ? $decoded : null;
     }
 
+    // Aufzählung als Buttons NEBENEINANDER (LAYOUT=1) - einheitliche Darstellung
+    private function EnumPresentation(array $options): array
+    {
+        return [
+            'PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION,
+            'OPTIONS'      => json_encode($options),
+            'LAYOUT'       => 1,
+            'DISPLAY'      => 0,
+        ];
+    }
+
     private function EnsureProfiles()
     {
         if (!IPS_VariableProfileExists('MERO.Plug')) {
@@ -235,6 +289,44 @@ class MerossDevice extends IPSModule
             IPS_SetVariableProfileValues('MERO.Pos', 0, 100, 1);
             IPS_SetVariableProfileText('MERO.Pos', '', ' %');
             IPS_SetVariableProfileIcon('MERO.Pos', 'Jalousie');
+        }
+        if (!IPS_VariableProfileExists('MERO.Light')) {
+            IPS_CreateVariableProfile('MERO.Light', 0); // Boolean
+            IPS_SetVariableProfileIcon('MERO.Light', 'Bulb');
+            IPS_SetVariableProfileAssociation('MERO.Light', 0, $this->Translate('Aus'), '', -1);
+            IPS_SetVariableProfileAssociation('MERO.Light', 1, $this->Translate('Ein'), '', 0xFFC107);
+        }
+        if (!IPS_VariableProfileExists('MERO.Bright')) {
+            IPS_CreateVariableProfile('MERO.Bright', 1); // Integer 0..100 %
+            IPS_SetVariableProfileValues('MERO.Bright', 0, 100, 1);
+            IPS_SetVariableProfileText('MERO.Bright', '', ' %');
+            IPS_SetVariableProfileIcon('MERO.Bright', 'Sun');
+        }
+        if (!IPS_VariableProfileExists('MERO.CTemp')) {
+            IPS_CreateVariableProfile('MERO.CTemp', 1); // Integer 0..100 %
+            IPS_SetVariableProfileValues('MERO.CTemp', 0, 100, 1);
+            IPS_SetVariableProfileText('MERO.CTemp', '', ' %');
+            IPS_SetVariableProfileIcon('MERO.CTemp', 'Temperature');
+        }
+        if (!IPS_VariableProfileExists('MERO.Garage')) {
+            IPS_CreateVariableProfile('MERO.Garage', 0); // Boolean
+            IPS_SetVariableProfileIcon('MERO.Garage', 'Door');
+            IPS_SetVariableProfileAssociation('MERO.Garage', 0, $this->Translate('Zu'), '', 0x2962FF);
+            IPS_SetVariableProfileAssociation('MERO.Garage', 1, $this->Translate('Auf'), '', 0x00C853);
+        }
+        if (!IPS_VariableProfileExists('MERO.SetTemp')) {
+            IPS_CreateVariableProfile('MERO.SetTemp', 2); // Float
+            IPS_SetVariableProfileValues('MERO.SetTemp', 5, 35, 0.5);
+            IPS_SetVariableProfileText('MERO.SetTemp', '', ' °C');
+            IPS_SetVariableProfileIcon('MERO.SetTemp', 'Temperature');
+        }
+        if (!IPS_VariableProfileExists('MERO.Mts100Mode')) {
+            IPS_CreateVariableProfile('MERO.Mts100Mode', 1); // Integer
+            IPS_SetVariableProfileValues('MERO.Mts100Mode', 0, 3, 1);
+            IPS_SetVariableProfileAssociation('MERO.Mts100Mode', 0, $this->Translate('Manuell'), '', -1);
+            IPS_SetVariableProfileAssociation('MERO.Mts100Mode', 1, $this->Translate('Komfort'), '', 0xFF7043);
+            IPS_SetVariableProfileAssociation('MERO.Mts100Mode', 2, $this->Translate('Sparen'), '', 0x29B6F6);
+            IPS_SetVariableProfileAssociation('MERO.Mts100Mode', 3, $this->Translate('Auto'), '', 0x66BB6A);
         }
     }
 }

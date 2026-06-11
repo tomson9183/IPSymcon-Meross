@@ -123,7 +123,7 @@ trait PlugDevice
     private function SyncLed()
     {
         $anyOn = false;
-        for ($ch = 0; $ch < 4; $ch++) {
+        for ($ch = 0; $ch < 6; $ch++) {
             $id = @$this->GetIDForIdent('STATE' . $ch);
             if ($id !== false && GetValue($id)) {
                 $anyOn = true;

@@ -115,6 +115,9 @@ class MerossConfigurator extends IPSModule
             if (!empty($cache['ts'])) {
                 $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Zuletzt aus der Cloud geladen: ') . date('d.m.Y H:i', (int) $cache['ts'])];
             }
+            if ($injectKey !== '') {
+                $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate('Konto-Key (automatisch erkannt): ') . $injectKey];
+            }
             $form['actions'][] = [
                 'type'     => 'Configurator',
                 'name'     => 'config',
@@ -297,6 +300,21 @@ class MerossConfigurator extends IPSModule
 
     private function MapType(string $t): string
     {
+        if (strpos($t, 'msh') !== false || strpos($t, 'hub') !== false) {
+            return 'hub';
+        }
+        if (strpos($t, 'mts200') !== false || strpos($t, 'mts215') !== false || strpos($t, 'mts960') !== false) {
+            return 'thermostat';
+        }
+        if (strpos($t, 'mss425') !== false || strpos($t, 'mss426') !== false || strpos($t, 'strip') !== false) {
+            return 'strip';
+        }
+        if (strpos($t, 'msl') !== false || strpos($t, 'bulb') !== false || strpos($t, '560') !== false) {
+            return 'light';
+        }
+        if (strpos($t, 'msg') !== false) {
+            return 'garage';
+        }
         if (strpos($t, '620') !== false) {
             return 'mss620';
         }

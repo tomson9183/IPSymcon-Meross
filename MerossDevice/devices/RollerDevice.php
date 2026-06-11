@@ -94,6 +94,7 @@ trait RollerDevice
                 // Tracking fuer einen evtl. spaeteren Stop mitfuehren, aber NICHT animieren.
                 $this->RollerStartMove($pos, false);
                 $this->SetValue('LEVEL', $pos);
+                $this->RollerReflect($pos);
             }
             return;
         }
@@ -145,6 +146,7 @@ trait RollerDevice
         $this->SetTimerInterval('MERO_RollerFollow', 0);
         $this->WriteAttributeInteger('MoveDurMs', 0);
         $this->SetValue('LEVEL', $est);
+        $this->RollerReflect($est);
         // kurz nicht ueberschreiben, dann echte Position bestaetigen
         $this->WriteAttributeInteger('FollowUntil', time() + 3);
     }
@@ -189,6 +191,7 @@ trait RollerDevice
             $this->SetTimerInterval('MERO_RollerFollow', 0);
             $this->WriteAttributeInteger('MoveDurMs', 0);
             $this->WriteAttributeInteger('FollowUntil', time() + 2);
+            $this->RollerReflect((int) $this->GetValue('LEVEL'));
         }
     }
 
@@ -196,6 +199,20 @@ trait RollerDevice
     private function RollerSetPosition(int $pos)
     {
         return $this->LocalRequest('Appliance.RollerShutter.Position', 'SET', ['position' => ['position' => $pos, 'channel' => 0]]);
+    }
+
+    // Spiegelt die aktuelle Position in die Buttons (MOVE):
+    //   offen (>=99) -> 0 = Auf,  geschlossen (<=1) -> 2 = Zu,  sonst 1 = Stop.
+    // Reine Anzeige-Aktualisierung (loest keine Aktion aus).
+    private function RollerReflect(int $pos)
+    {
+        if (@$this->GetIDForIdent('MOVE') === false) {
+            return;
+        }
+        $m = ($pos >= 99) ? 0 : (($pos <= 1) ? 2 : 1);
+        if ((int) $this->GetValue('MOVE') !== $m) {
+            $this->SetValue('MOVE', $m);
+        }
     }
 
     private function RollerUpdate()
@@ -215,6 +232,7 @@ trait RollerDevice
         $pos = $resp['payload']['position'][0]['position'] ?? null;
         if ($pos !== null && @$this->GetIDForIdent('LEVEL') !== false) {
             $this->SetValue('LEVEL', (int) $pos);
+            $this->RollerReflect((int) $pos);
         }
     }
 

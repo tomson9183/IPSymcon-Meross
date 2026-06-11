@@ -12,7 +12,13 @@
             "options": [
                 { "caption": "MSS210P – Steckdose (1 Kanal)", "value": "mss210p" },
                 { "caption": "MSS620 – Doppelsteckdose (2 Kanäle)", "value": "mss620" },
-                { "caption": "MRS100 – Rollladen", "value": "mrs100" }
+                { "caption": "Steckdose / Schalter – allgemein (ToggleX)", "value": "plug" },
+                { "caption": "Mehrfachsteckdose / Steckdosenleiste (Kanäle automatisch)", "value": "strip" },
+                { "caption": "MRS100 – Rollladen", "value": "mrs100" },
+                { "caption": "Lampe / Dimmer / LED (MSL-Serie, MSS560)", "value": "light" },
+                { "caption": "Garagentoröffner (MSG100 / MSG200)", "value": "garage" },
+                { "caption": "Hub MSH300 (Sensoren + Thermostat-Ventile)", "value": "hub" },
+                { "caption": "WLAN-Thermostat (MTS200 / MTS215B / MTS960)", "value": "thermostat" }
             ]
         },
         {
