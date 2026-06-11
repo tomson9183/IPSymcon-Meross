@@ -198,27 +198,66 @@ class MerossDevice extends IPSModule
         echo $this->Translate('Rollladen-Konfiguration ins Debug-Fenster geschrieben.');
     }
 
-    // Diagnose: liest beide Thermostat-Formate roh aus und gibt die Felder
-    // lesbar aus (Ist-Feld, mode-Werte je Modell zum Feinjustieren).
+    // Diagnose: ermittelt zuerst, ob/was das Geraet kann, und liest dann den
+    // passenden Thermostat-Namespace roh aus (Ist-Feld, mode-Werte je Modell).
     public function ThermoDiag()
     {
         $lines = [];
-        foreach (['Appliance.Control.Thermostat.ModeB' => 'modeB', 'Appliance.Control.Thermostat.Mode' => 'mode'] as $ns => $key) {
+
+        // 0) Host/Key vorhanden?
+        if ($this->ReadPropertyString('Host') === '' || $this->ReadPropertyString('Key') === '') {
+            $out = 'Host oder Key ist leer -> bitte IP und Konto-Key setzen.';
+            $this->SendDebug('Thermo.Diag', $out, 0);
+            echo $this->Translate('Thermostat-Diagnose') . ":\n\n" . $out;
+            return;
+        }
+
+        // 1) Faehigkeiten des Geraets (entscheidet ueber den Namespace)
+        $ab = $this->LocalRequest('Appliance.System.Ability', 'GET', []);
+        if ($ab === null) {
+            $out = "Appliance.System.Ability: KEINE ANTWORT.\n"
+                 . "Das Geraet antwortet nicht einmal auf die Basis-Abfrage -> es ist\n"
+                 . "unter dieser IP nicht erreichbar (siehe Debug-Fenster: curl-Fehler).";
+            $this->SendDebug('Thermo.Diag', $out, 0);
+            echo $this->Translate('Thermostat-Diagnose') . ":\n\n" . $out;
+            return;
+        }
+        $names = array_keys($ab['payload']['ability'] ?? []);
+        sort($names);
+        $thermo = array_values(array_filter($names, function ($n) {
+            return stripos($n, 'thermostat') !== false || stripos($n, 'mts') !== false;
+        }));
+        $lines[] = '=== Unterstuetzte Namespaces (gesamt: ' . count($names) . ') ===';
+        $lines[] = implode("\n", $names);
+        $lines[] = '';
+        $lines[] = '=== Thermostat-relevante Namespaces ===';
+        $lines[] = $thermo ? implode("\n", $thermo) : '(keine gefunden -> evtl. kein eigenstaendiges WLAN-Thermostat)';
+        $lines[] = '';
+
+        // 2) digest aus System.All (Zustand steckt oft schon hier)
+        $all = $this->LocalRequest('Appliance.System.All', 'GET', []);
+        $digest = $all['payload']['all']['digest'] ?? null;
+        if (is_array($digest)) {
+            $lines[] = '=== System.All digest (Top-Level-Schluessel) ===';
+            $lines[] = implode(', ', array_keys($digest));
+            if (isset($digest['thermostat'])) {
+                $lines[] = 'digest.thermostat = ' . json_encode($digest['thermostat']);
+            }
+            $lines[] = '';
+        }
+
+        // 3) Die gefundenen Thermostat-Namespaces roh auslesen
+        $probe = $thermo ?: ['Appliance.Control.Thermostat.ModeB', 'Appliance.Control.Thermostat.Mode'];
+        foreach ($probe as $ns) {
             $resp = $this->LocalRequest($ns, 'GET', []);
             if ($resp === null) {
                 $lines[] = $ns . ': keine Antwort';
                 continue;
             }
-            $d = $resp['payload'][$key][0] ?? null;
-            if (!is_array($d)) {
-                $lines[] = $ns . ': kein Datensatz (' . $key . '[0] fehlt)';
-                continue;
-            }
-            $lines[] = '=== ' . $ns . ' ===';
-            foreach ($d as $f => $v) {
-                $lines[] = '  ' . $f . ' = ' . (is_scalar($v) ? (string) $v : json_encode($v));
-            }
+            $lines[] = '=== ' . $ns . ' (payload roh) ===';
+            $lines[] = json_encode($resp['payload'] ?? null);
         }
+
         $out = implode("\n", $lines);
         $this->SendDebug('Thermo.Diag', $out, 0);
         echo $this->Translate('Thermostat-Diagnose (auch im Debug-Fenster)') . ":\n\n" . $out;
