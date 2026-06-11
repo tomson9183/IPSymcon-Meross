@@ -171,13 +171,16 @@ class MerossDevice extends IPSModule
     private function CleanupForeignVars(string $type)
     {
         $sets = [
-            'plug'   => ['STATE0', 'STATE1', 'STATE2', 'STATE3', 'STATE4', 'STATE5', 'POWER', 'VOLTAGE', 'CURRENT', 'ENERGY_TODAY'],
-            'roller' => ['MOVE', 'LEVEL'],
-            'light'  => ['STATE', 'BRIGHT', 'COLOR', 'CTEMP'],
-            'garage' => ['DOOR'],
+            'plug'       => ['STATE0', 'STATE1', 'STATE2', 'STATE3', 'STATE4', 'STATE5', 'POWER', 'VOLTAGE', 'CURRENT', 'ENERGY_TODAY'],
+            'roller'     => ['MOVE', 'LEVEL'],
+            'light'      => ['STATE', 'BRIGHT', 'COLOR', 'CTEMP'],
+            'garage'     => ['DOOR'],
+            'thermostat' => ['TEMP', 'SET', 'ONOFF', 'HEAT', 'MODE'],
         ];
+        // Hub-Variablen sind dynamisch (subId-Suffix) und werden hier nicht
+        // erfasst; sie bleiben beim Typwechsel ggf. stehen.
         $keep = $sets[$this->TypeGroup($type)] ?? $sets['plug'];
-        $all  = array_merge($sets['plug'], $sets['roller'], $sets['light'], $sets['garage']);
+        $all  = array_merge($sets['plug'], $sets['roller'], $sets['light'], $sets['garage'], $sets['thermostat']);
         foreach (array_diff($all, $keep) as $id) {
             if (@$this->GetIDForIdent($id) !== false) {
                 $this->UnregisterVariable($id);
@@ -193,6 +196,32 @@ class MerossDevice extends IPSModule
         $pos = $this->LocalRequest('Appliance.RollerShutter.Position', 'GET', []);
         $this->SendDebug('Roller.Position', $pos === null ? 'keine Antwort' : json_encode($pos), 0);
         echo $this->Translate('Rollladen-Konfiguration ins Debug-Fenster geschrieben.');
+    }
+
+    // Diagnose: liest beide Thermostat-Formate roh aus und gibt die Felder
+    // lesbar aus (Ist-Feld, mode-Werte je Modell zum Feinjustieren).
+    public function ThermoDiag()
+    {
+        $lines = [];
+        foreach (['Appliance.Control.Thermostat.ModeB' => 'modeB', 'Appliance.Control.Thermostat.Mode' => 'mode'] as $ns => $key) {
+            $resp = $this->LocalRequest($ns, 'GET', []);
+            if ($resp === null) {
+                $lines[] = $ns . ': keine Antwort';
+                continue;
+            }
+            $d = $resp['payload'][$key][0] ?? null;
+            if (!is_array($d)) {
+                $lines[] = $ns . ': kein Datensatz (' . $key . '[0] fehlt)';
+                continue;
+            }
+            $lines[] = '=== ' . $ns . ' ===';
+            foreach ($d as $f => $v) {
+                $lines[] = '  ' . $f . ' = ' . (is_scalar($v) ? (string) $v : json_encode($v));
+            }
+        }
+        $out = implode("\n", $lines);
+        $this->SendDebug('Thermo.Diag', $out, 0);
+        echo $this->Translate('Thermostat-Diagnose (auch im Debug-Fenster)') . ":\n\n" . $out;
     }
 
     // Alte Variablen aus frueheren Versionen entfernen
