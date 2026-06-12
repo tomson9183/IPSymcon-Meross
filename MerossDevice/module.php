@@ -175,7 +175,7 @@ class MerossDevice extends IPSModule
             'roller'     => ['MOVE', 'LEVEL'],
             'light'      => ['STATE', 'BRIGHT', 'COLOR', 'CTEMP'],
             'garage'     => ['DOOR'],
-            'thermostat' => ['TEMP', 'SET', 'ONOFF', 'HEAT', 'MODE'],
+            'thermostat' => ['VISU', 'TEMP', 'SET', 'ONOFF', 'HEAT', 'MODE'],
         ];
         // Hub-Variablen sind dynamisch (subId-Suffix) und werden hier nicht
         // erfasst; sie bleiben beim Typwechsel ggf. stehen.
@@ -387,6 +387,12 @@ class MerossDevice extends IPSModule
             IPS_SetVariableProfileValues('MERO.SetTemp', 5, 35, 0.5);
             IPS_SetVariableProfileText('MERO.SetTemp', '', ' °C');
             IPS_SetVariableProfileIcon('MERO.SetTemp', 'Temperature');
+        }
+        if (!IPS_VariableProfileExists('MERO.Heat')) {
+            IPS_CreateVariableProfile('MERO.Heat', 0); // Boolean: heizt gerade
+            IPS_SetVariableProfileIcon('MERO.Heat', 'Flame');
+            IPS_SetVariableProfileAssociation('MERO.Heat', 0, $this->Translate('Aus'), '', -1);
+            IPS_SetVariableProfileAssociation('MERO.Heat', 1, $this->Translate('Heizt'), '', 0xFF6B35);
         }
         if (!IPS_VariableProfileExists('MERO.Mts100Mode')) {
             IPS_CreateVariableProfile('MERO.Mts100Mode', 1); // Integer
