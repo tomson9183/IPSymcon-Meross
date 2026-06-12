@@ -77,6 +77,10 @@ class MerossDevice extends IPSModule
             default:       $this->PlugApplyChanges();   break;
         }
 
+        // Thermostat zeigt eine eigene interaktive HTML-Kachel (HTML-SDK),
+        // alle anderen Typen die normale Variablen-Kachel.
+        $this->SetVisualizationType($this->TypeGroup($type) === 'thermostat' ? 1 : 0);
+
         // Name aus der Cloud uebernehmen (vom Konfigurator gesetzt)
         $devName = trim($this->ReadPropertyString('DeviceName'));
         if ($devName !== '' && IPS_GetName($this->InstanceID) !== $devName) {
@@ -96,6 +100,15 @@ class MerossDevice extends IPSModule
         $this->SetTimerInterval('MERO_Poll', $interval > 0 ? $interval * 1000 : 0);
     }
 
+    // HTML-SDK: Inhalt der eigenen Kachel (nur Thermostat liefert eine)
+    public function GetVisualizationTile()
+    {
+        if ($this->TypeGroup($this->ReadPropertyString('DeviceType')) === 'thermostat') {
+            return $this->ThermoVisualizationTile();
+        }
+        return '';
+    }
+
     public function RequestAction($Ident, $Value)
     {
         switch ($this->TypeGroup($this->ReadPropertyString('DeviceType'))) {
@@ -103,7 +116,7 @@ class MerossDevice extends IPSModule
             case 'light':  $this->LightRequestAction($Ident, $Value);  break;
             case 'garage': $this->GarageRequestAction($Ident, $Value); break;
             case 'hub':    $this->HubRequestAction($Ident, $Value);    break;
-            case 'thermostat': $this->ThermoRequestAction($Ident, $Value); break;
+            case 'thermostat': $this->ThermoRequestAction($Ident, $Value); $this->ThermoPushVisu(); break;
             default:       $this->PlugRequestAction($Ident, $Value);   break;
         }
     }
@@ -175,7 +188,7 @@ class MerossDevice extends IPSModule
             'roller'     => ['MOVE', 'LEVEL'],
             'light'      => ['STATE', 'BRIGHT', 'COLOR', 'CTEMP'],
             'garage'     => ['DOOR'],
-            'thermostat' => ['VISU', 'TEMP', 'SET', 'ONOFF', 'HEAT', 'MODE'],
+            'thermostat' => ['TEMP', 'SET', 'ONOFF', 'HEAT', 'MODE'],
         ];
         // Hub-Variablen sind dynamisch (subId-Suffix) und werden hier nicht
         // erfasst; sie bleiben beim Typwechsel ggf. stehen.
@@ -266,7 +279,7 @@ class MerossDevice extends IPSModule
     // Alte Variablen aus frueheren Versionen entfernen
     private function CleanupLegacyVars()
     {
-        foreach (['LED', 'SHUTTER', 'CONTROL', 'POSITION'] as $old) {
+        foreach (['LED', 'SHUTTER', 'CONTROL', 'POSITION', 'VISU'] as $old) {
             if (@$this->GetIDForIdent($old) !== false) {
                 $this->UnregisterVariable($old);
             }

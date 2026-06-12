@@ -35,9 +35,8 @@ trait ThermostatDevice
 {
     private function ThermoApplyChanges()
     {
-        // Schöne HTML-Karte ganz oben (read-only; gesteuert wird über die Variablen darunter)
-        $this->RegisterVariableString('VISU', $this->Translate('Anzeige'), '~HTMLBox', 5);
-
+        // Die schöne, interaktive Kachel kommt über das HTML-SDK
+        // (SetVisualizationType/GetVisualizationTile in module.php).
         $this->RegisterVariableFloat('TEMP', $this->Translate('Temperatur'), '~Temperature', 10);
         $this->RegisterVariableFloat('SET', $this->Translate('Soll-Temperatur'), 'MERO.SetTemp', 20);
         $this->EnableAction('SET');
@@ -167,69 +166,120 @@ trait ThermostatDevice
             $this->SetValue('MODE', $mode);
         }
 
-        // Grenzen für die Ringanzeige (sonst Standard 5–35 °C)
-        $min = isset($d['min']) ? round(((int) $d['min']) / $scale, 1) : 5.0;
-        $max = isset($d['max']) ? round(((int) $d['max']) / $scale, 1) : 35.0;
-
-        if (@$this->GetIDForIdent('VISU') !== false) {
-            $this->SetValue('VISU', $this->ThermoVisuHtml(
-                $curC ?? 0.0,
-                $setC ?? 0.0,
-                $mode,
-                $heat,
-                $on,
-                $min,
-                $max
-            ));
-        }
+        // Kachel live aktualisieren
+        $this->ThermoPushVisu();
     }
 
-    // Schicke read-only Thermostat-Karte (Ring-Anzeige) als HTML/SVG für ~HTMLBox
-    private function ThermoVisuHtml(float $cur, float $set, int $mode, bool $heat, bool $on, float $min, float $max): string
+    // ---- HTML-SDK: interaktive Kachel -------------------------------------
+
+    // Aktuelle Werte als JSON-String (Format frei wählbar) für die Kachel
+    private function ThermoVisuPayload(): string
     {
-        $modes = [
-            0 => [$this->Translate('Heizen'),  '#FF7043'],
-            1 => [$this->Translate('Kühlen'),  '#29B6F6'],
-            2 => [$this->Translate('Eco'),     '#66BB6A'],
-            3 => [$this->Translate('Auto'),    '#9E9E9E'],
-            4 => [$this->Translate('Manuell'), '#FFB300'],
-        ];
-        [$mName, $mColor] = $modes[$mode] ?? ['—', '#9E9E9E'];
-
-        $accent = !$on ? '#566' : ($heat ? '#FF6B35' : $mColor);
-        $span   = ($max - $min) > 0 ? ($max - $min) : 1;
-        $frac   = max(0.0, min(1.0, ($set - $min) / $span));
-
-        $r    = 84.0;
-        $circ = 2 * M_PI * $r;
-        $prog = round($frac * $circ, 1);
-        $circR = round($circ, 1);
-
-        $de = function (float $v): string {
-            return number_format($v, 1, ',', '.');
+        $get = function (string $id, $fallback) {
+            return (@$this->GetIDForIdent($id) !== false) ? $this->GetValue($id) : $fallback;
         };
-        $curTxt = $on ? $de($cur) : '–';
-        $opacity = $on ? '1' : '0.5';
+        return json_encode([
+            'cur'  => (float) $get('TEMP', 0.0),
+            'set'  => (float) $get('SET', 20.0),
+            'mode' => (int) $get('MODE', 3),
+            'heat' => (bool) $get('HEAT', false),
+            'on'   => (bool) $get('ONOFF', true),
+            'min'  => 5,
+            'max'  => 35,
+        ]);
+    }
 
-        $heatRow = ($on && $heat)
-            ? '<div style="margin-top:8px;font-size:13px;font-weight:600;color:#FF6B35;">🔥 ' . $this->Translate('heizt') . '</div>'
-            : '<div style="margin-top:8px;font-size:13px;color:#7a8290;">' . ($on ? $this->Translate('Standby') : $this->Translate('Aus')) . '</div>';
+    // Aktuellen Zustand an die geöffnete Kachel senden
+    private function ThermoPushVisu()
+    {
+        $this->UpdateVisualizationValue($this->ThermoVisuPayload());
+    }
 
-        return ''
-            . '<div style="max-width:260px;margin:0 auto;padding:18px 14px;border-radius:18px;'
-            . 'background:linear-gradient(160deg,#1e2230,#161922);font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;'
-            . 'text-align:center;color:#e8ebf0;box-shadow:0 6px 18px rgba(0,0,0,.35);opacity:' . $opacity . ';">'
-            .   '<svg viewBox="0 0 200 200" style="width:180px;height:180px;">'
-            .     '<circle cx="100" cy="100" r="' . $r . '" fill="none" stroke="#2b2f3a" stroke-width="14"/>'
-            .     '<circle cx="100" cy="100" r="' . $r . '" fill="none" stroke="' . $accent . '" stroke-width="14" '
-            .       'stroke-linecap="round" stroke-dasharray="' . $prog . ' ' . $circR . '" transform="rotate(-90 100 100)"/>'
-            .     '<text x="100" y="96" text-anchor="middle" font-size="46" font-weight="700" fill="#ffffff">' . $curTxt . '</text>'
-            .     '<text x="100" y="122" text-anchor="middle" font-size="16" fill="#9aa3b2">°C</text>'
-            .   '</svg>'
-            .   '<div style="font-size:15px;color:#c7ccd6;margin-top:2px;">' . $this->Translate('Soll') . ' <b style="color:#fff;">' . $de($set) . ' °C</b></div>'
-            .   '<div style="display:inline-block;margin-top:10px;padding:5px 14px;border-radius:999px;'
-            .     'background:' . $mColor . ';color:#10131a;font-size:13px;font-weight:700;letter-spacing:.3px;">' . $mName . '</div>'
-            .   $heatRow
-            . '</div>';
+    // HTML + JS der Kachel; Steuerung per requestAction() direkt ins Modul
+    private function ThermoVisualizationTile(): string
+    {
+        $html = <<<'HTML'
+<style>
+  .mt-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
+    padding:6px 4px;box-sizing:border-box;}
+  .mt-dial{position:relative;width:130px;height:130px;margin:0 auto;}
+  .mt-dial svg{width:130px;height:130px;display:block;}
+  .mt-cur{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;}
+  .mt-cur b{font-size:27px;font-weight:700;line-height:1;color:#fff;}
+  .mt-cur span{font-size:12px;color:#9aa3b2;margin-top:2px;}
+  .mt-steps{display:inline-flex;gap:10px;align-items:center;margin-top:6px;}
+  .mt-step{width:30px;height:30px;border-radius:50%;border:none;cursor:pointer;font-size:18px;
+    font-weight:700;background:#2b2f3a;color:#fff;line-height:30px;padding:0;}
+  .mt-step:active{transform:scale(.9);}
+  .mt-set{font-size:13px;color:#c7ccd6;min-width:78px;}
+  .mt-set b{color:#fff;}
+  .mt-modes{margin-top:8px;display:flex;gap:5px;justify-content:center;flex-wrap:wrap;}
+  .mt-mode{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;
+    background:#2b2f3a;color:#c7ccd6;}
+  .mt-mode.active{color:#10131a;}
+  .mt-power{margin-top:8px;}
+  .mt-power button{padding:4px 18px;border-radius:999px;border:none;cursor:pointer;
+    font-size:12px;font-weight:700;}
+</style>
+<div class="mt-card" id="mtCard">
+  <div class="mt-dial">
+    <svg viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="84" fill="none" stroke="#2b2f3a" stroke-width="16"/>
+      <circle id="mtRing" cx="100" cy="100" r="84" fill="none" stroke="#FFB300" stroke-width="16"
+        stroke-linecap="round" stroke-dasharray="0 528" transform="rotate(-90 100 100)"/>
+    </svg>
+    <div class="mt-cur"><b id="mtCur">–</b><span>°C</span></div>
+  </div>
+  <div class="mt-steps">
+    <button class="mt-step" onclick="mtStep(-0.5)">&minus;</button>
+    <span class="mt-set">Soll <b id="mtSet">–</b> °C</span>
+    <button class="mt-step" onclick="mtStep(0.5)">+</button>
+  </div>
+  <div class="mt-modes" id="mtModes">
+    <span class="mt-mode" data-m="0" onclick="requestAction('MODE',0)">Heizen</span>
+    <span class="mt-mode" data-m="1" onclick="requestAction('MODE',1)">Kühlen</span>
+    <span class="mt-mode" data-m="2" onclick="requestAction('MODE',2)">Eco</span>
+    <span class="mt-mode" data-m="3" onclick="requestAction('MODE',3)">Auto</span>
+    <span class="mt-mode" data-m="4" onclick="requestAction('MODE',4)">Manuell</span>
+  </div>
+  <div class="mt-power"><button id="mtPower" onclick="mtToggle()">…</button></div>
+</div>
+<script>
+  window.mtState = {cur:0,set:20,mode:3,heat:false,on:true,min:5,max:35};
+  var MT_COL = {0:'#FF7043',1:'#29B6F6',2:'#66BB6A',3:'#9E9E9E',4:'#FFB300'};
+  function mtStep(d){
+    var s=window.mtState, v=Math.min(s.max,Math.max(s.min,s.set+d));
+    v=Math.round(v*2)/2;
+    requestAction('SET', v);
+  }
+  function mtToggle(){ requestAction('ONOFF', !window.mtState.on); }
+  function handleMessage(message){
+    var d = (typeof message==='string') ? JSON.parse(message) : message;
+    window.mtState = d;
+    var C = 2*Math.PI*84;
+    var span = (d.max-d.min)>0 ? (d.max-d.min) : 1;
+    var frac = Math.min(1,Math.max(0,(d.set-d.min)/span));
+    var accent = !d.on ? '#556270' : (d.heat ? '#FF6B35' : (MT_COL[d.mode]||'#9E9E9E'));
+    var ring = document.getElementById('mtRing');
+    ring.setAttribute('stroke', accent);
+    ring.setAttribute('stroke-dasharray', (frac*C).toFixed(1)+' '+C.toFixed(1));
+    document.getElementById('mtCur').textContent = d.on ? Number(d.cur).toFixed(1).replace('.',',') : '–';
+    document.getElementById('mtSet').textContent = Number(d.set).toFixed(1).replace('.',',');
+    var ms = document.querySelectorAll('#mtModes .mt-mode');
+    for (var i=0;i<ms.length;i++){
+      var m = parseInt(ms[i].getAttribute('data-m'),10);
+      if (m===d.mode){ ms[i].classList.add('active'); ms[i].style.background = MT_COL[m]; }
+      else { ms[i].classList.remove('active'); ms[i].style.background='#2b2f3a'; }
+    }
+    var pw = document.getElementById('mtPower');
+    pw.textContent = d.on ? 'Ein' : 'Aus';
+    pw.style.background = d.on ? '#00C853' : '#444a57';
+    pw.style.color = d.on ? '#08210f' : '#cfd4dd';
+    document.getElementById('mtCard').style.opacity = d.on ? '1' : '0.55';
+  }
+</script>
+HTML;
+        return $html . '<script>handleMessage(' . json_encode($this->ThermoVisuPayload()) . ');</script>';
     }
 }
