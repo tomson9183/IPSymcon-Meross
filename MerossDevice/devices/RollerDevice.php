@@ -269,9 +269,9 @@ trait RollerDevice
         $html = <<<'HTML'
 <style>
   .rs-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    padding:8px 4px;box-sizing:border-box;}
-  .rs-win{width:150px;margin:0 auto;}
-  .rs-win svg{width:150px;height:auto;display:block;}
+    width:100%;box-sizing:border-box;padding:8px 6px;}
+  .rs-win{width:100%;max-width:200px;margin:0 auto;}
+  .rs-win svg{width:100%;height:auto;display:block;}
   .rs-state{margin-top:4px;font-size:13px;color:#c7ccd6;}
   .rs-state b{color:#fff;}
   .rs-btns{margin-top:8px;display:flex;gap:6px;justify-content:center;}
@@ -285,7 +285,7 @@ trait RollerDevice
 </style>
 <div class="rs-card" id="rsCard">
   <div class="rs-win">
-    <svg viewBox="0 0 200 184">
+    <svg viewBox="0 0 200 184" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="rsGlass" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#bfe3ff"/><stop offset="100%" stop-color="#eaf6ff"/>
@@ -339,6 +339,8 @@ trait RollerDevice
     var sl=document.getElementById('rsSlider');
     if(document.activeElement!==sl){ sl.value=l; }
   }
+  // Manche Renderer messen die Kachel erst nach einem Resize -> einmal antriggern
+  window.addEventListener('load', function(){ setTimeout(function(){ try{ window.dispatchEvent(new Event('resize')); }catch(e){} }, 60); });
 </script>
 HTML;
         return $html . '<script>try{handleMessage(' . json_encode($this->RollerVisuPayload()) . ');}catch(e){}</script>';

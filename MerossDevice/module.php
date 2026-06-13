@@ -77,9 +77,9 @@ class MerossDevice extends IPSModule
             default:       $this->PlugApplyChanges();   break;
         }
 
-        // Thermostat und Rollladen zeigen eine eigene interaktive HTML-Kachel
-        // (HTML-SDK), alle anderen Typen die normale Variablen-Kachel.
-        $hasTile = in_array($this->TypeGroup($type), ['thermostat', 'roller'], true);
+        // Diese Gruppen zeigen eine eigene interaktive HTML-Kachel (HTML-SDK),
+        // alle anderen Typen die normale Variablen-Kachel.
+        $hasTile = in_array($this->TypeGroup($type), ['thermostat', 'roller', 'plug'], true);
         $this->SetVisualizationType($hasTile ? 1 : 0);
 
         // Name aus der Cloud uebernehmen (vom Konfigurator gesetzt)
@@ -109,7 +109,7 @@ class MerossDevice extends IPSModule
     public function GetVisualizationTile()
     {
         $group = $this->TypeGroup($this->ReadPropertyString('DeviceType'));
-        if ($group === 'thermostat' || $group === 'roller') {
+        if (in_array($group, ['thermostat', 'roller', 'plug'], true)) {
             // Beim Oeffnen der Kachel sofort frische Werte holen, damit sie
             // nicht leer/veraltet ist und nicht erst auf den naechsten Poll wartet.
             $this->Update();
@@ -117,6 +117,7 @@ class MerossDevice extends IPSModule
         switch ($group) {
             case 'thermostat': return $this->ThermoVisualizationTile();
             case 'roller':     return $this->RollerVisualizationTile();
+            case 'plug':       return $this->PlugVisualizationTile();
         }
         return '';
     }
@@ -129,7 +130,7 @@ class MerossDevice extends IPSModule
             case 'garage': $this->GarageRequestAction($Ident, $Value); break;
             case 'hub':    $this->HubRequestAction($Ident, $Value);    break;
             case 'thermostat': $this->ThermoRequestAction($Ident, $Value); $this->ThermoPushVisu(); break;
-            default:       $this->PlugRequestAction($Ident, $Value);   break;
+            default:       $this->PlugRequestAction($Ident, $Value); $this->PlugPushVisu(); break;
         }
     }
 

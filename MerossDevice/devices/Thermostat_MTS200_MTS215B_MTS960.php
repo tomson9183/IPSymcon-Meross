@@ -201,31 +201,25 @@ trait ThermostatDevice
         $html = <<<'HTML'
 <style>
   .mt-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    padding:6px 4px;box-sizing:border-box;}
-  .mt-dial{position:relative;width:130px;height:130px;margin:0 auto;}
-  .mt-dial svg{width:130px;height:130px;display:block;}
-  .mt-cur{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;}
-  .mt-cur b{font-size:27px;font-weight:700;line-height:1;color:#fff;}
-  .mt-cur span{font-size:12px;color:#9aa3b2;margin-top:2px;}
-  .mt-steps{display:inline-flex;gap:10px;align-items:center;margin-top:6px;}
-  .mt-step{width:30px;height:30px;border-radius:50%;border:none;cursor:pointer;font-size:18px;
-    font-weight:700;background:#2b2f3a;color:#fff;line-height:30px;padding:0;}
+    width:100%;box-sizing:border-box;padding:8px 6px;}
+  .mt-dial{width:100%;max-width:300px;margin:0 auto;}
+  .mt-dial svg{width:100%;height:auto;display:block;}
+  .mt-steps{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:8px;flex-wrap:wrap;}
+  .mt-step{width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;font-size:20px;
+    font-weight:700;background:#2b2f3a;color:#fff;line-height:34px;padding:0;}
   .mt-step:active{transform:scale(.9);}
-  .mt-set{font-size:13px;color:#c7ccd6;min-width:78px;}
-  .mt-set b{color:#fff;}
-  .mt-modes{margin-top:8px;display:flex;gap:5px;justify-content:center;flex-wrap:wrap;}
-  .mt-mode{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;
+  .mt-set{font-size:14px;color:#c7ccd6;} .mt-set b{color:#fff;}
+  .mt-modes{margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;}
+  .mt-mode{padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;
     background:#2b2f3a;color:#c7ccd6;}
   .mt-mode.active{color:#10131a;}
-  .mt-heat{margin-top:6px;font-size:12px;font-weight:600;color:#FF6B35;height:15px;}
-  .mt-power{margin-top:6px;}
-  .mt-power button{padding:4px 18px;border-radius:999px;border:none;cursor:pointer;
-    font-size:12px;font-weight:700;}
+  .mt-power{margin-top:10px;}
+  .mt-power button{padding:5px 20px;border-radius:999px;border:none;cursor:pointer;
+    font-size:13px;font-weight:700;}
 </style>
 <div class="mt-card" id="mtCard">
   <div class="mt-dial">
-    <svg viewBox="0 0 200 200">
+    <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="mtGrad" x1="0" y1="1" x2="0" y2="0">
           <stop id="mtG0" offset="0%" stop-color="#2E7CF6"/>
@@ -235,8 +229,13 @@ trait ThermostatDevice
       <circle cx="100" cy="100" r="84" fill="none" stroke="#2b2f3a" stroke-width="16"/>
       <circle id="mtRing" cx="100" cy="100" r="84" fill="none" stroke="url(#mtGrad)" stroke-width="16"
         stroke-linecap="round" stroke-dasharray="0 528" transform="rotate(-90 100 100)"/>
+      <text id="mtCur" x="100" y="97" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"
+        font-size="44" font-weight="700" fill="#ffffff">–</text>
+      <text x="100" y="122" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"
+        font-size="15" fill="#9aa3b2">°C</text>
+      <text id="mtHeat" x="100" y="150" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"
+        font-size="13" font-weight="700" fill="#FF6B35"></text>
     </svg>
-    <div class="mt-cur"><b id="mtCur">–</b><span>°C</span></div>
   </div>
   <div class="mt-steps">
     <button class="mt-step" onclick="mtStep(-0.5)">&minus;</button>
@@ -250,7 +249,6 @@ trait ThermostatDevice
     <span class="mt-mode" data-m="3" onclick="requestAction('MODE',3)">Auto</span>
     <span class="mt-mode" data-m="4" onclick="requestAction('MODE',4)">Manuell</span>
   </div>
-  <div class="mt-heat" id="mtHeat"></div>
   <div class="mt-power"><button id="mtPower" onclick="mtToggle()">…</button></div>
 </div>
 <script>
@@ -289,8 +287,12 @@ trait ThermostatDevice
       ring.style.filter = 'none';
     }
     ring.setAttribute('stroke-dasharray', (frac*C).toFixed(1)+' '+C.toFixed(1));
-    document.getElementById('mtHeat').textContent = (d.on && d.heat) ? '● heizt' : '';
-    document.getElementById('mtCur').textContent = d.on ? Number(d.cur).toFixed(1).replace('.',',') : '–';
+    var heatEl = document.getElementById('mtHeat');
+    if (!d.on){ heatEl.textContent='aus'; heatEl.setAttribute('fill','#7a8290'); }
+    else if (d.heat){ heatEl.textContent='● heizt'; heatEl.setAttribute('fill','#FF6B35'); }
+    else { heatEl.textContent=''; }
+    // Ist-Temperatur immer anzeigen – auch wenn das Thermostat ausgeschaltet ist
+    document.getElementById('mtCur').textContent = Number(d.cur).toFixed(1).replace('.',',');
     document.getElementById('mtSet').textContent = Number(d.set).toFixed(1).replace('.',',');
     var ms = document.querySelectorAll('#mtModes .mt-mode');
     for (var i=0;i<ms.length;i++){
@@ -302,8 +304,10 @@ trait ThermostatDevice
     pw.textContent = d.on ? 'Ein' : 'Aus';
     pw.style.background = d.on ? '#00C853' : '#444a57';
     pw.style.color = d.on ? '#08210f' : '#cfd4dd';
-    document.getElementById('mtCard').style.opacity = d.on ? '1' : '0.55';
+    document.getElementById('mtCard').style.opacity = d.on ? '1' : '0.9';
   }
+  // Manche Renderer messen die Kachel erst nach einem Resize -> einmal antriggern
+  window.addEventListener('load', function(){ setTimeout(function(){ try{ window.dispatchEvent(new Event('resize')); }catch(e){} }, 60); });
 </script>
 HTML;
         return $html . '<script>try{handleMessage(' . json_encode($this->ThermoVisuPayload()) . ');}catch(e){}</script>';

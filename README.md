@@ -43,5 +43,26 @@ Möglichst selten in der Cloud anmelden. Bei zu häufigen Anmeldungen sperrt
 Meross das Konto vorübergehend (ca. 5 Stunden). Der Konfigurator meldet sich
 nur per Knopfdruck an, die Geräte-Instanzen selbst nie.
 
+## Rechtliche Hinweise / Haftungsausschluss
+- **Inoffiziell:** Dieses Projekt ist ein freies Community-Modul und steht in **keiner
+  Verbindung** zu Meross bzw. der Chengdu Meross Technology Co., Ltd. und wird von
+  dieser **nicht unterstützt oder geprüft**. „Meross" sowie Modellbezeichnungen sind
+  Marken der jeweiligen Inhaber und werden hier nur zur **Beschreibung der
+  Kompatibilität** genannt (nominative Nutzung).
+- **Keine Gewähr / Haftung:** Die Nutzung erfolgt **auf eigene Gefahr**. Das Modul wird
+  „wie besehen" ohne jede Gewährleistung bereitgestellt (siehe LICENSE/MIT). Eine
+  Haftung für Schäden, Fehlfunktionen oder Datenverlust ist – soweit gesetzlich
+  zulässig – ausgeschlossen. Das gilt besonders für **sicherheitsrelevante Geräte**
+  (z. B. Garagentor, Heizung/Thermostat): Funktion und gefahrlose Bedienung sind
+  eigenverantwortlich zu prüfen.
+- **Lokale Schnittstelle:** Die Steuerung nutzt eine **inoffizielle, aus der
+  Community dokumentierte Geräte-Schnittstelle**. Die einmalige Cloud-Anmeldung dient
+  ausschließlich dem Abruf der **eigenen** Geräteliste, des Konto-Keys und der lokalen
+  IPs mit den **eigenen Zugangsdaten** des Nutzers. Bitte die Nutzungsbedingungen von
+  Meross beachten.
+- **Daten:** Zugangsdaten und Konto-Key verbleiben in der eigenen IP-Symcon-Installation;
+  das Modul gibt sie nicht an Dritte weiter.
+- Diese Hinweise sind keine Rechtsberatung.
+
 ## Lizenz
 MIT – siehe LICENSE.
