@@ -269,9 +269,10 @@ trait RollerDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
-  body{text-align:center;}
-  .rs-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    display:inline-block;width:220px;box-sizing:border-box;padding:8px 6px;transform-origin:top center;}
+  #rsBox{position:relative;width:100%;overflow:hidden;}
+  .rs-card{position:absolute;left:50%;top:50%;transform-origin:center center;
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
+    width:220px;box-sizing:border-box;padding:8px 6px;}
   .rs-win{width:100%;margin:0 auto;}
   .rs-win svg{width:100%;height:auto;display:block;}
   .rs-state{margin-top:4px;font-size:13px;color:#c7ccd6;}
@@ -285,7 +286,7 @@ trait RollerDevice
     font-size:10px;color:#8a93a0;}
   .rs-slider input{width:108px;}
 </style>
-<div class="rs-card" id="rsCard">
+<div id="rsBox"><div class="rs-card" id="rsCard">
   <div class="rs-win">
     <svg viewBox="0 0 200 184" preserveAspectRatio="xMidYMid meet">
       <defs>
@@ -326,7 +327,7 @@ trait RollerDevice
       oninput="rsLbl(this.value)" onchange="requestAction('LEVEL', parseInt(this.value,10))">
     <span>Auf</span>
   </div>
-</div>
+</div></div>
 <script>
   window.rsLevel = 0;
   function rsLbl(v){ document.getElementById('rsState').innerHTML = rsTxt(parseInt(v,10)); }
@@ -344,13 +345,14 @@ trait RollerDevice
   }
   // Inhalt passgenau auf die Kachel (iframe) skalieren (waechst/schrumpft mit, kein Scrollen)
   function rsFit(){
-    var c=document.getElementById('rsCard'); if(!c) return;
-    c.style.marginTop='0'; c.style.transform='none';
+    var box=document.getElementById('rsBox'), c=document.getElementById('rsCard');
+    if(!box||!c) return;
     var w=window.innerWidth||1, h=window.innerHeight||1;
+    box.style.height=h+'px';
+    c.style.transform='translate(-50%,-50%)';
     var s=Math.min(w/(c.offsetWidth||1), h/(c.offsetHeight||1));
     if(!isFinite(s)||s<=0) s=1;
-    c.style.transform='scale('+s+')';
-    var top=(h-c.offsetHeight*s)/2; c.style.marginTop=(top>0?top:0)+'px';
+    c.style.transform='translate(-50%,-50%) scale('+s+')';
   }
   window.addEventListener('resize', rsFit);
   window.addEventListener('load', function(){ rsFit(); setTimeout(rsFit,80); setTimeout(rsFit,300); });

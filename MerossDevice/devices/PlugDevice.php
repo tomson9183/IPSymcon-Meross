@@ -175,9 +175,10 @@ trait PlugDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
-  body{text-align:center;}
-  .pg-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    display:inline-block;width:250px;box-sizing:border-box;padding:10px 8px;transform-origin:top center;}
+  #pgBox{position:relative;width:100%;overflow:hidden;}
+  .pg-card{position:absolute;left:50%;top:50%;transform-origin:center center;
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
+    width:250px;box-sizing:border-box;padding:10px 8px;}
   .pg-ico{width:100%;max-width:104px;margin:0 auto;}
   .pg-ico svg{width:100%;height:auto;display:block;}
   .pg-ch{margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
@@ -190,7 +191,7 @@ trait PlugDevice
   .pg-m b{display:block;font-size:15px;color:#fff;font-weight:700;}
   .pg-m span{color:#8a93a0;font-size:10px;}
 </style>
-<div class="pg-card" id="pgCard">
+<div id="pgBox"><div class="pg-card" id="pgCard">
   <div class="pg-ico">
     <svg viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet">
       <circle id="pgGlow" cx="60" cy="60" r="46" fill="none" stroke="#2b2f3a" stroke-width="10"/>
@@ -200,7 +201,7 @@ trait PlugDevice
   </div>
   <div class="pg-ch" id="pgCh"></div>
   <div class="pg-metrics" id="pgMetrics"></div>
-</div>
+</div></div>
 <script>
   window.pgState = {channels:[]};
   function pgToggle(ch){
@@ -231,13 +232,14 @@ trait PlugDevice
   }
   // Inhalt passgenau auf die Kachel (iframe) skalieren (waechst/schrumpft mit, kein Scrollen)
   function pgFit(){
-    var c=document.getElementById('pgCard'); if(!c) return;
-    c.style.marginTop='0'; c.style.transform='none';
+    var box=document.getElementById('pgBox'), c=document.getElementById('pgCard');
+    if(!box||!c) return;
     var w=window.innerWidth||1, h=window.innerHeight||1;
+    box.style.height=h+'px';
+    c.style.transform='translate(-50%,-50%)';
     var s=Math.min(w/(c.offsetWidth||1), h/(c.offsetHeight||1));
     if(!isFinite(s)||s<=0) s=1;
-    c.style.transform='scale('+s+')';
-    var top=(h-c.offsetHeight*s)/2; c.style.marginTop=(top>0?top:0)+'px';
+    c.style.transform='translate(-50%,-50%) scale('+s+')';
   }
   window.addEventListener('resize', pgFit);
   window.addEventListener('load', function(){ pgFit(); setTimeout(pgFit,80); setTimeout(pgFit,300); });

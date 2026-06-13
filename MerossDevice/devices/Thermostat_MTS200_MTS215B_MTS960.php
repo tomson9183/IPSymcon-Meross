@@ -201,11 +201,17 @@ trait ThermostatDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
-  body{text-align:center;}
-  .mt-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    display:inline-block;width:240px;box-sizing:border-box;padding:8px 6px;transform-origin:top center;}
-  .mt-dial{width:100%;margin:0 auto;}
+  #mtBox{position:relative;width:100%;overflow:hidden;}
+  .mt-card{position:absolute;left:50%;top:50%;transform-origin:center center;
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
+    width:240px;box-sizing:border-box;padding:8px 6px;}
+  .mt-dial{position:relative;width:100%;margin:0 auto;}
   .mt-dial svg{width:100%;height:auto;display:block;}
+  .mt-cur{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;pointer-events:none;}
+  .mt-cur b{font-size:42px;font-weight:700;line-height:1;color:#fff;}
+  .mt-cur small{font-size:14px;color:#9aa3b2;margin-top:2px;}
+  .mt-cur i{font-size:12px;font-style:normal;font-weight:700;margin-top:4px;min-height:14px;}
   .mt-steps{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:8px;flex-wrap:wrap;}
   .mt-step{width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;font-size:20px;
     font-weight:700;background:#2b2f3a;color:#fff;line-height:34px;padding:0;}
@@ -219,7 +225,7 @@ trait ThermostatDevice
   .mt-power button{padding:5px 20px;border-radius:999px;border:none;cursor:pointer;
     font-size:13px;font-weight:700;}
 </style>
-<div class="mt-card" id="mtCard">
+<div id="mtBox"><div class="mt-card" id="mtCard">
   <div class="mt-dial">
     <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
       <defs>
@@ -231,13 +237,8 @@ trait ThermostatDevice
       <circle cx="100" cy="100" r="84" fill="none" stroke="#2b2f3a" stroke-width="16"/>
       <circle id="mtRing" cx="100" cy="100" r="84" fill="none" stroke="url(#mtGrad)" stroke-width="16"
         stroke-linecap="round" stroke-dasharray="0 528" transform="rotate(-90 100 100)"/>
-      <text id="mtCur" x="100" y="97" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"
-        font-size="44" font-weight="700" fill="#ffffff">–</text>
-      <text x="100" y="122" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"
-        font-size="15" fill="#9aa3b2">°C</text>
-      <text id="mtHeat" x="100" y="150" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"
-        font-size="13" font-weight="700" fill="#FF6B35"></text>
     </svg>
+    <div class="mt-cur"><b id="mtCur">–</b><small>°C</small><i id="mtHeat"></i></div>
   </div>
   <div class="mt-steps">
     <button class="mt-step" onclick="mtStep(-0.5)">&minus;</button>
@@ -252,7 +253,7 @@ trait ThermostatDevice
     <span class="mt-mode" data-m="4" onclick="requestAction('MODE',4)">Manuell</span>
   </div>
   <div class="mt-power"><button id="mtPower" onclick="mtToggle()">…</button></div>
-</div>
+</div></div>
 <script>
   window.mtState = {cur:0,set:20,mode:3,heat:false,on:true,min:5,max:35};
   var MT_COL = {0:'#FF7043',1:'#29B6F6',2:'#66BB6A',3:'#9E9E9E',4:'#FFB300'};
@@ -277,25 +278,27 @@ trait ThermostatDevice
     var C = 2*Math.PI*84;
     var span = (d.max-d.min)>0 ? (d.max-d.min) : 1;
     var frac = Math.min(1,Math.max(0,(d.set-d.min)/span));
-    var ring = document.getElementById('mtRing');
-    // Ring-Verlauf blau->rot; warmes Ende folgt der Temperatur (Soll)
-    if (d.on) {
-      document.getElementById('mtG0').setAttribute('stop-color', '#2E7CF6');
-      document.getElementById('mtG1').setAttribute('stop-color', mtTempCol(d.set, d.min, d.max));
-      ring.style.filter = d.heat ? 'drop-shadow(0 0 5px #FF6B35)' : 'none';
-    } else {
-      document.getElementById('mtG0').setAttribute('stop-color', '#556270');
-      document.getElementById('mtG1').setAttribute('stop-color', '#7a8290');
-      ring.style.filter = 'none';
-    }
-    ring.setAttribute('stroke-dasharray', (frac*C).toFixed(1)+' '+C.toFixed(1));
-    var heatEl = document.getElementById('mtHeat');
-    if (!d.on){ heatEl.textContent='aus'; heatEl.setAttribute('fill','#7a8290'); }
-    else if (d.heat){ heatEl.textContent='● heizt'; heatEl.setAttribute('fill','#FF6B35'); }
-    else { heatEl.textContent=''; }
-    // Ist-Temperatur immer anzeigen – auch wenn das Thermostat ausgeschaltet ist
+    // Werte zuerst setzen (HTML-Overlay -> in jedem Browser sichtbar, auch beim Skalieren)
     document.getElementById('mtCur').textContent = Number(d.cur).toFixed(1).replace('.',',');
     document.getElementById('mtSet').textContent = Number(d.set).toFixed(1).replace('.',',');
+    var heatEl = document.getElementById('mtHeat');
+    if (!d.on){ heatEl.textContent='aus'; heatEl.style.color='#7a8290'; }
+    else if (d.heat){ heatEl.textContent='● heizt'; heatEl.style.color='#FF6B35'; }
+    else { heatEl.textContent=''; }
+    // Ring-Verlauf blau->rot; warmes Ende folgt der Soll-Temperatur (defensiv gekapselt)
+    try {
+      var ring = document.getElementById('mtRing');
+      if (d.on) {
+        document.getElementById('mtG0').setAttribute('stop-color', '#2E7CF6');
+        document.getElementById('mtG1').setAttribute('stop-color', mtTempCol(d.set, d.min, d.max));
+        ring.style.filter = d.heat ? 'drop-shadow(0 0 5px #FF6B35)' : 'none';
+      } else {
+        document.getElementById('mtG0').setAttribute('stop-color', '#556270');
+        document.getElementById('mtG1').setAttribute('stop-color', '#7a8290');
+        ring.style.filter = 'none';
+      }
+      ring.setAttribute('stroke-dasharray', (frac*C).toFixed(1)+' '+C.toFixed(1));
+    } catch(e){}
     var ms = document.querySelectorAll('#mtModes .mt-mode');
     for (var i=0;i<ms.length;i++){
       var m = parseInt(ms[i].getAttribute('data-m'),10);
@@ -312,13 +315,14 @@ trait ThermostatDevice
   // Inhalt passgenau auf die Kachel (iframe) skalieren: waechst/schrumpft mit der
   // eingestellten Kachelgroesse, kein Scrollen. Misst window.inner* (=Kachelgroesse).
   function mtFit(){
-    var c=document.getElementById('mtCard'); if(!c) return;
-    c.style.marginTop='0'; c.style.transform='none';
+    var box=document.getElementById('mtBox'), c=document.getElementById('mtCard');
+    if(!box||!c) return;
     var w=window.innerWidth||1, h=window.innerHeight||1;
+    box.style.height=h+'px';
+    c.style.transform='translate(-50%,-50%)';
     var s=Math.min(w/(c.offsetWidth||1), h/(c.offsetHeight||1));
     if(!isFinite(s)||s<=0) s=1;
-    c.style.transform='scale('+s+')';
-    var top=(h-c.offsetHeight*s)/2; c.style.marginTop=(top>0?top:0)+'px';
+    c.style.transform='translate(-50%,-50%) scale('+s+')';
   }
   window.addEventListener('resize', mtFit);
   window.addEventListener('load', function(){ mtFit(); setTimeout(mtFit,80); setTimeout(mtFit,300); });
