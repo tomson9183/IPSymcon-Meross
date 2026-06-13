@@ -256,11 +256,14 @@ trait ThermostatDevice
 <script>
   window.mtState = {cur:0,set:20,mode:3,heat:false,on:true,min:5,max:35};
   var MT_COL = {0:'#FF7043',1:'#29B6F6',2:'#66BB6A',3:'#9E9E9E',4:'#FFB300'};
-  // Temperatur -> Farbe: blau (kalt) ueber violett zu rot (warm)
+  // Temperatur -> Farbe: blau (kalt) ueber violett zu rot (warm); als Hex (SVG-sicher)
+  function mtHsl(h,s,l){ h=((h%360)+360)%360/360; var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+    function H(t){ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<0.5)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; }
+    function X(v){ v=Math.round(v*255).toString(16); return v.length<2?'0'+v:v; }
+    return '#'+X(H(h+1/3))+X(H(h))+X(H(h-1/3)); }
   function mtTempCol(t,min,max){
     var f=Math.min(1,Math.max(0,(t-min)/((max-min)||1)));
-    var h=240+120*f;            // 240=blau ... 360=rot
-    return 'hsl('+h.toFixed(0)+',72%,55%)';
+    return mtHsl(240+120*f,0.72,0.55);   // 240=blau ... 360=rot
   }
   function mtStep(d){
     var s=window.mtState, v=Math.min(s.max,Math.max(s.min,s.set+d));
@@ -303,6 +306,6 @@ trait ThermostatDevice
   }
 </script>
 HTML;
-        return $html . '<script>handleMessage(' . json_encode($this->ThermoVisuPayload()) . ');</script>';
+        return $html . '<script>try{handleMessage(' . json_encode($this->ThermoVisuPayload()) . ');}catch(e){}</script>';
     }
 }

@@ -341,6 +341,6 @@ trait RollerDevice
   }
 </script>
 HTML;
-        return $html . '<script>handleMessage(' . json_encode($this->RollerVisuPayload()) . ');</script>';
+        return $html . '<script>try{handleMessage(' . json_encode($this->RollerVisuPayload()) . ');}catch(e){}</script>';
     }
 }

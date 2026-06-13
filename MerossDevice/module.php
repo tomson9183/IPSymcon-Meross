@@ -34,7 +34,7 @@ class MerossDevice extends IPSModule
         $this->RegisterPropertyString('DeviceName', '');
         $this->RegisterPropertyString('Uuid', '');
         $this->RegisterPropertyString('Key', '');
-        $this->RegisterPropertyInteger('PollInterval', 10);
+        $this->RegisterPropertyInteger('PollInterval', 3);
 
         $this->RegisterAttributeBoolean('LastLed', true);
 
@@ -99,12 +99,22 @@ class MerossDevice extends IPSModule
         $this->SetStatus(102);
         $interval = $this->ReadPropertyInteger('PollInterval');
         $this->SetTimerInterval('MERO_Poll', $interval > 0 ? $interval * 1000 : 0);
+
+        // Sofort einmal frische Daten holen (nicht erst beim naechsten Poll-Tick),
+        // damit Variablen/Kachel direkt nach dem Aktivieren aktuell sind.
+        $this->Update();
     }
 
     // HTML-SDK: Inhalt der eigenen Kachel (Thermostat / Rollladen)
     public function GetVisualizationTile()
     {
-        switch ($this->TypeGroup($this->ReadPropertyString('DeviceType'))) {
+        $group = $this->TypeGroup($this->ReadPropertyString('DeviceType'));
+        if ($group === 'thermostat' || $group === 'roller') {
+            // Beim Oeffnen der Kachel sofort frische Werte holen, damit sie
+            // nicht leer/veraltet ist und nicht erst auf den naechsten Poll wartet.
+            $this->Update();
+        }
+        switch ($group) {
             case 'thermostat': return $this->ThermoVisualizationTile();
             case 'roller':     return $this->RollerVisualizationTile();
         }
