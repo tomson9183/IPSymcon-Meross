@@ -272,7 +272,9 @@ trait RollerDevice
   #rsBox{position:relative;width:100%;overflow:hidden;}
   .rs-card{position:absolute;left:50%;top:50%;transform-origin:center center;
     font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:220px;box-sizing:border-box;padding:8px 6px;}
+    width:220px;box-sizing:border-box;padding:12px 10px;
+    background:linear-gradient(160deg,#222738,#161a24);border-radius:18px;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);}
   .rs-win{width:100%;margin:0 auto;}
   .rs-win svg{width:100%;height:auto;display:block;}
   .rs-state{margin-top:4px;font-size:13px;color:#c7ccd6;}

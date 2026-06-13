@@ -178,7 +178,9 @@ trait PlugDevice
   #pgBox{position:relative;width:100%;overflow:hidden;}
   .pg-card{position:absolute;left:50%;top:50%;transform-origin:center center;
     font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:250px;box-sizing:border-box;padding:10px 8px;}
+    width:250px;box-sizing:border-box;padding:12px 10px;
+    background:linear-gradient(160deg,#222738,#161a24);border-radius:18px;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);}
   .pg-ico{width:100%;max-width:104px;margin:0 auto;}
   .pg-ico svg{width:100%;height:auto;display:block;}
   .pg-ch{margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}

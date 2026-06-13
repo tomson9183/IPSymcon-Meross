@@ -204,7 +204,9 @@ trait ThermostatDevice
   #mtBox{position:relative;width:100%;overflow:hidden;}
   .mt-card{position:absolute;left:50%;top:50%;transform-origin:center center;
     font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:240px;box-sizing:border-box;padding:8px 6px;}
+    width:240px;box-sizing:border-box;padding:12px 10px;
+    background:linear-gradient(160deg,#222738,#161a24);border-radius:18px;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);}
   .mt-dial{position:relative;width:100%;margin:0 auto;}
   .mt-dial svg{width:100%;height:auto;display:block;}
   .mt-cur{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;
