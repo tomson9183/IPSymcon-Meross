@@ -136,6 +136,12 @@ class MerossDevice extends IPSModule
 
     public function Update()
     {
+        // Während des IPS-Starts feuert der (kurze) Poll-Timer ggf. bevor die
+        // Instanz bereit ist -> Geräte-/Visu-Aufrufe würden "InstanceInterface
+        // is not available" werfen. Erst ab KR_READY abfragen.
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return;
+        }
         switch ($this->TypeGroup($this->ReadPropertyString('DeviceType'))) {
             case 'roller': $this->RollerUpdate(); break;
             case 'light':  $this->LightUpdate();  break;
