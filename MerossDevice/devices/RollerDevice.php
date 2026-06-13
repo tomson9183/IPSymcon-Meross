@@ -268,11 +268,9 @@ trait RollerDevice
     {
         $html = <<<'HTML'
 <style>
-  html,body{height:100%;margin:0;padding:0;}
-  #rsWrap{position:fixed;inset:0;width:100vw;height:100vh;display:flex;align-items:center;
-    justify-content:center;overflow:hidden;}
+  body{margin:0;}
   .rs-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:210px;box-sizing:border-box;padding:6px;transform-origin:center center;flex:0 0 auto;}
+    width:100%;max-width:230px;margin:0 auto;box-sizing:border-box;padding:8px 6px;}
   .rs-win{width:100%;margin:0 auto;}
   .rs-win svg{width:100%;height:auto;display:block;}
   .rs-state{margin-top:4px;font-size:13px;color:#c7ccd6;}
@@ -286,7 +284,7 @@ trait RollerDevice
     font-size:10px;color:#8a93a0;}
   .rs-slider input{width:108px;}
 </style>
-<div id="rsWrap"><div class="rs-card" id="rsCard">
+<div class="rs-card" id="rsCard">
   <div class="rs-win">
     <svg viewBox="0 0 200 184" preserveAspectRatio="xMidYMid meet">
       <defs>
@@ -327,7 +325,7 @@ trait RollerDevice
       oninput="rsLbl(this.value)" onchange="requestAction('LEVEL', parseInt(this.value,10))">
     <span>Auf</span>
   </div>
-</div></div>
+</div>
 <script>
   window.rsLevel = 0;
   function rsLbl(v){ document.getElementById('rsState').innerHTML = rsTxt(parseInt(v,10)); }
@@ -341,19 +339,7 @@ trait RollerDevice
     document.getElementById('rsState').innerHTML=rsTxt(l);
     var sl=document.getElementById('rsSlider');
     if(document.activeElement!==sl){ sl.value=l; }
-    rsFit();
   }
-  // Inhalt automatisch auf die eingestellte Kachelgroesse skalieren (immer ganz sichtbar)
-  function rsFit(){
-    var w=document.getElementById('rsWrap'), c=document.getElementById('rsCard');
-    if(!w||!c) return;
-    c.style.transform='none';
-    var s=Math.min(w.clientWidth/(c.offsetWidth||1), w.clientHeight/(c.offsetHeight||1));
-    if(!isFinite(s)||s<=0) s=1;
-    c.style.transform='scale('+s+')';
-  }
-  window.addEventListener('resize', rsFit);
-  window.addEventListener('load', function(){ rsFit(); setTimeout(rsFit,60); setTimeout(rsFit,300); });
 </script>
 HTML;
         return $html . '<script>try{handleMessage(' . json_encode($this->RollerVisuPayload()) . ');}catch(e){}</script>';

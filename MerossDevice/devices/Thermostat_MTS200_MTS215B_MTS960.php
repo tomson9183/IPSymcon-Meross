@@ -200,11 +200,9 @@ trait ThermostatDevice
     {
         $html = <<<'HTML'
 <style>
-  html,body{height:100%;margin:0;padding:0;}
-  #mtWrap{position:fixed;inset:0;width:100vw;height:100vh;display:flex;align-items:center;
-    justify-content:center;overflow:hidden;}
+  body{margin:0;}
   .mt-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:240px;box-sizing:border-box;padding:6px;transform-origin:center center;flex:0 0 auto;}
+    width:100%;max-width:300px;margin:0 auto;box-sizing:border-box;padding:8px 6px;}
   .mt-dial{width:100%;margin:0 auto;}
   .mt-dial svg{width:100%;height:auto;display:block;}
   .mt-steps{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:8px;flex-wrap:wrap;}
@@ -220,7 +218,7 @@ trait ThermostatDevice
   .mt-power button{padding:5px 20px;border-radius:999px;border:none;cursor:pointer;
     font-size:13px;font-weight:700;}
 </style>
-<div id="mtWrap"><div class="mt-card" id="mtCard">
+<div class="mt-card" id="mtCard">
   <div class="mt-dial">
     <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
       <defs>
@@ -253,7 +251,7 @@ trait ThermostatDevice
     <span class="mt-mode" data-m="4" onclick="requestAction('MODE',4)">Manuell</span>
   </div>
   <div class="mt-power"><button id="mtPower" onclick="mtToggle()">…</button></div>
-</div></div>
+</div>
 <script>
   window.mtState = {cur:0,set:20,mode:3,heat:false,on:true,min:5,max:35};
   var MT_COL = {0:'#FF7043',1:'#29B6F6',2:'#66BB6A',3:'#9E9E9E',4:'#FFB300'};
@@ -308,20 +306,7 @@ trait ThermostatDevice
     pw.style.background = d.on ? '#00C853' : '#444a57';
     pw.style.color = d.on ? '#08210f' : '#cfd4dd';
     document.getElementById('mtCard').style.opacity = d.on ? '1' : '0.9';
-    mtFit();
   }
-  // Inhalt automatisch auf die eingestellte Kachelgroesse skalieren (immer ganz sichtbar)
-  function mtFit(){
-    var w=document.getElementById('mtWrap'), c=document.getElementById('mtCard');
-    if(!w||!c) return;
-    c.style.transform='none';
-    var cw=c.offsetWidth||1, ch=c.offsetHeight||1;
-    var s=Math.min(w.clientWidth/cw, w.clientHeight/ch);
-    if(!isFinite(s)||s<=0) s=1;
-    c.style.transform='scale('+s+')';
-  }
-  window.addEventListener('resize', mtFit);
-  window.addEventListener('load', function(){ mtFit(); setTimeout(mtFit,60); setTimeout(mtFit,300); });
 </script>
 HTML;
         return $html . '<script>try{handleMessage(' . json_encode($this->ThermoVisuPayload()) . ');}catch(e){}</script>';

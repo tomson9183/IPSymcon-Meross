@@ -174,11 +174,9 @@ trait PlugDevice
     {
         $html = <<<'HTML'
 <style>
-  html,body{height:100%;margin:0;padding:0;}
-  #pgWrap{position:fixed;inset:0;width:100vw;height:100vh;display:flex;align-items:center;
-    justify-content:center;overflow:hidden;}
+  body{margin:0;}
   .pg-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:240px;box-sizing:border-box;padding:8px;transform-origin:center center;flex:0 0 auto;}
+    width:100%;max-width:260px;margin:0 auto;box-sizing:border-box;padding:10px 8px;}
   .pg-ico{width:100%;max-width:104px;margin:0 auto;}
   .pg-ico svg{width:100%;height:auto;display:block;}
   .pg-ch{margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
@@ -191,7 +189,7 @@ trait PlugDevice
   .pg-m b{display:block;font-size:15px;color:#fff;font-weight:700;}
   .pg-m span{color:#8a93a0;font-size:10px;}
 </style>
-<div id="pgWrap"><div class="pg-card" id="pgCard">
+<div class="pg-card" id="pgCard">
   <div class="pg-ico">
     <svg viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet">
       <circle id="pgGlow" cx="60" cy="60" r="46" fill="none" stroke="#2b2f3a" stroke-width="10"/>
@@ -201,7 +199,7 @@ trait PlugDevice
   </div>
   <div class="pg-ch" id="pgCh"></div>
   <div class="pg-metrics" id="pgMetrics"></div>
-</div></div>
+</div>
 <script>
   window.pgState = {channels:[]};
   function pgToggle(ch){
@@ -228,19 +226,7 @@ trait PlugDevice
     function add(v,lbl,dec){ if(v!==null&&v!==undefined){ m+='<div class="pg-m"><b>'+Number(v).toFixed(dec).replace('.',',')+'</b><span>'+lbl+'</span></div>'; } }
     add(d.power,'Watt',1); add(d.voltage,'Volt',1); add(d.current,'Ampere',2); add(d.energy,'kWh heute',3);
     document.getElementById('pgMetrics').innerHTML=m;
-    pgFit();
   }
-  // Inhalt automatisch auf die eingestellte Kachelgroesse skalieren (immer ganz sichtbar)
-  function pgFit(){
-    var w=document.getElementById('pgWrap'), c=document.getElementById('pgCard');
-    if(!w||!c) return;
-    c.style.transform='none';
-    var s=Math.min(w.clientWidth/(c.offsetWidth||1), w.clientHeight/(c.offsetHeight||1));
-    if(!isFinite(s)||s<=0) s=1;
-    c.style.transform='scale('+s+')';
-  }
-  window.addEventListener('resize', pgFit);
-  window.addEventListener('load', function(){ pgFit(); setTimeout(pgFit,60); setTimeout(pgFit,300); });
 </script>
 HTML;
         return $html . '<script>try{handleMessage(' . json_encode($this->PlugVisuPayload()) . ');}catch(e){}</script>';
