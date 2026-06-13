@@ -269,23 +269,25 @@ trait RollerDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
+  :root{ --num:#ffffff; --txt:#c7ccd6; --sub:#8a93a0; --chip:#2b2f3a; --chiptx:#e8ebf0; }
+  @media (prefers-color-scheme: light){
+    :root{ --num:#13202b; --txt:#3a4753; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; }
+  }
   #rsBox{position:relative;width:100%;overflow:hidden;}
   .rs-card{position:absolute;left:50%;top:50%;transform-origin:center center;
-    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:220px;box-sizing:border-box;padding:12px 10px;
-    background:linear-gradient(160deg,#222738,#161a24);border-radius:18px;
-    box-shadow:0 6px 18px rgba(0,0,0,.35);}
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--txt);text-align:center;
+    width:220px;box-sizing:border-box;padding:6px;background:transparent;}
   .rs-win{width:100%;margin:0 auto;}
   .rs-win svg{width:100%;height:auto;display:block;}
-  .rs-state{margin-top:4px;font-size:13px;color:#c7ccd6;}
-  .rs-state b{color:#fff;}
+  .rs-state{margin-top:6px;font-size:13px;color:var(--txt);}
+  .rs-state b{color:var(--num);}
   .rs-btns{margin-top:8px;display:flex;gap:6px;justify-content:center;}
   .rs-btns button{padding:6px 12px;border-radius:9px;border:none;cursor:pointer;
-    font-size:12px;font-weight:700;background:#2b2f3a;color:#e8ebf0;}
+    font-size:12px;font-weight:700;background:var(--chip);color:var(--chiptx);}
   .rs-btns button:active{transform:scale(.94);}
-  .rs-up{color:#9ad27a;} .rs-stop{color:#ffd166;} .rs-dn{color:#7cc0ff;}
+  .rs-up{color:#2e9e4f;} .rs-stop{color:#d99100;} .rs-dn{color:#2f7fd0;}
   .rs-slider{margin-top:10px;display:flex;align-items:center;gap:8px;justify-content:center;
-    font-size:10px;color:#8a93a0;}
+    font-size:10px;color:var(--sub);}
   .rs-slider input{width:108px;}
 </style>
 <div id="rsBox"><div class="rs-card" id="rsCard">

@@ -201,27 +201,31 @@ trait ThermostatDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
+  /* Theme-adaptive Farben (passt sich Hell/Dunkel der Visu an) */
+  :root{ --num:#ffffff; --txt:#c7ccd6; --sub:#9aa3b2; --chip:#2b2f3a; --chiptx:#c7ccd6; --track:#2b2f3a; }
+  @media (prefers-color-scheme: light){
+    :root{ --num:#13202b; --txt:#3a4753; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; --track:#dde2e9; }
+  }
   #mtBox{position:relative;width:100%;overflow:hidden;}
   .mt-card{position:absolute;left:50%;top:50%;transform-origin:center center;
-    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:240px;box-sizing:border-box;padding:12px 10px;
-    background:linear-gradient(160deg,#222738,#161a24);border-radius:18px;
-    box-shadow:0 6px 18px rgba(0,0,0,.35);}
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--txt);text-align:center;
+    width:240px;box-sizing:border-box;padding:6px;background:transparent;}
   .mt-dial{position:relative;width:100%;margin:0 auto;}
   .mt-dial svg{width:100%;height:auto;display:block;}
+  .mt-track{stroke:var(--track);}
   .mt-cur{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;pointer-events:none;}
-  .mt-cur b{font-size:42px;font-weight:700;line-height:1;color:#fff;}
-  .mt-cur small{font-size:14px;color:#9aa3b2;margin-top:2px;}
+  .mt-cur b{font-size:42px;font-weight:700;line-height:1;color:var(--num);}
+  .mt-cur small{font-size:14px;color:var(--sub);margin-top:2px;}
   .mt-cur i{font-size:12px;font-style:normal;font-weight:700;margin-top:4px;min-height:14px;}
   .mt-steps{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:8px;flex-wrap:wrap;}
   .mt-step{width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;font-size:20px;
-    font-weight:700;background:#2b2f3a;color:#fff;line-height:34px;padding:0;}
+    font-weight:700;background:var(--chip);color:var(--num);line-height:34px;padding:0;}
   .mt-step:active{transform:scale(.9);}
-  .mt-set{font-size:14px;color:#c7ccd6;} .mt-set b{color:#fff;}
+  .mt-set{font-size:14px;color:var(--txt);} .mt-set b{color:var(--num);}
   .mt-modes{margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;}
   .mt-mode{padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;
-    background:#2b2f3a;color:#c7ccd6;}
+    background:var(--chip);color:var(--chiptx);}
   .mt-mode.active{color:#10131a;}
   .mt-power{margin-top:10px;}
   .mt-power button{padding:5px 20px;border-radius:999px;border:none;cursor:pointer;
@@ -236,7 +240,7 @@ trait ThermostatDevice
           <stop id="mtG1" offset="100%" stop-color="#FF3B30"/>
         </linearGradient>
       </defs>
-      <circle cx="100" cy="100" r="84" fill="none" stroke="#2b2f3a" stroke-width="16"/>
+      <circle class="mt-track" cx="100" cy="100" r="84" fill="none" stroke="#2b2f3a" stroke-width="16"/>
       <circle id="mtRing" cx="100" cy="100" r="84" fill="none" stroke="url(#mtGrad)" stroke-width="16"
         stroke-linecap="round" stroke-dasharray="0 528" transform="rotate(-90 100 100)"/>
     </svg>
@@ -305,7 +309,7 @@ trait ThermostatDevice
     for (var i=0;i<ms.length;i++){
       var m = parseInt(ms[i].getAttribute('data-m'),10);
       if (m===d.mode){ ms[i].classList.add('active'); ms[i].style.background = MT_COL[m]; }
-      else { ms[i].classList.remove('active'); ms[i].style.background='#2b2f3a'; }
+      else { ms[i].classList.remove('active'); ms[i].style.background=''; }
     }
     var pw = document.getElementById('mtPower');
     pw.textContent = d.on ? 'Ein' : 'Aus';

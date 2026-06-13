@@ -175,23 +175,25 @@ trait PlugDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
+  :root{ --num:#ffffff; --sub:#8a93a0; --chip:#2b2f3a; --chiptx:#cfd4dd; }
+  @media (prefers-color-scheme: light){
+    :root{ --num:#13202b; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; }
+  }
   #pgBox{position:relative;width:100%;overflow:hidden;}
   .pg-card{position:absolute;left:50%;top:50%;transform-origin:center center;
-    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:250px;box-sizing:border-box;padding:12px 10px;
-    background:linear-gradient(160deg,#222738,#161a24);border-radius:18px;
-    box-shadow:0 6px 18px rgba(0,0,0,.35);}
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--chiptx);text-align:center;
+    width:250px;box-sizing:border-box;padding:6px;background:transparent;}
   .pg-ico{width:100%;max-width:104px;margin:0 auto;}
   .pg-ico svg{width:100%;height:auto;display:block;}
   .pg-ch{margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
   .pg-btn{min-width:86px;padding:8px 14px;border-radius:12px;border:none;cursor:pointer;
-    font-size:13px;font-weight:700;background:#2b2f3a;color:#cfd4dd;}
+    font-size:13px;font-weight:700;background:var(--chip);color:var(--chiptx);}
   .pg-btn.on{background:#00C853;color:#08210f;}
   .pg-btn small{display:block;font-size:10px;font-weight:600;opacity:.85;margin-top:2px;}
   .pg-metrics{margin-top:12px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;}
-  .pg-m{background:#20242e;border-radius:10px;padding:7px 11px;min-width:60px;}
-  .pg-m b{display:block;font-size:15px;color:#fff;font-weight:700;}
-  .pg-m span{color:#8a93a0;font-size:10px;}
+  .pg-m{background:var(--chip);border-radius:10px;padding:7px 11px;min-width:60px;}
+  .pg-m b{display:block;font-size:15px;color:var(--num);font-weight:700;}
+  .pg-m span{color:var(--sub);font-size:10px;}
 </style>
 <div id="pgBox"><div class="pg-card" id="pgCard">
   <div class="pg-ico">
@@ -219,7 +221,7 @@ trait PlugDevice
     var col=anyOn?'#00C853':'#6b7280';
     document.getElementById('pgArc').setAttribute('stroke',col);
     document.getElementById('pgBar').setAttribute('stroke',col);
-    document.getElementById('pgGlow').setAttribute('stroke',anyOn?'rgba(0,200,83,.28)':'#2b2f3a');
+    document.getElementById('pgGlow').setAttribute('stroke',anyOn?'rgba(0,200,83,.28)':'rgba(128,138,150,.28)');
     var h='';
     for(var i=0;i<ch.length;i++){
       var c=ch[i], lbl=(ch.length>1)?('Kanal '+(c.ch+1)):'Schalter';
