@@ -147,6 +147,7 @@ trait RollerDevice
         $this->WriteAttributeInteger('MoveDurMs', 0);
         $this->SetValue('LEVEL', $est);
         $this->RollerReflect($est);
+        $this->RollerPushVisu();
         // kurz nicht ueberschreiben, dann echte Position bestaetigen
         $this->WriteAttributeInteger('FollowUntil', time() + 3);
     }
@@ -186,6 +187,7 @@ trait RollerDevice
 
         $cur = $this->RollerEstimatePosition();
         $this->SetValue('LEVEL', max(0, min(100, $cur)));
+        $this->RollerPushVisu();
 
         if ($done) {
             $this->SetTimerInterval('MERO_RollerFollow', 0);
@@ -233,6 +235,7 @@ trait RollerDevice
         if ($pos !== null && @$this->GetIDForIdent('LEVEL') !== false) {
             $this->SetValue('LEVEL', (int) $pos);
             $this->RollerReflect((int) $pos);
+            $this->RollerPushVisu();
         }
     }
 
@@ -244,5 +247,100 @@ trait RollerDevice
         } else {
             $this->SendDebug('Rollladen', "$what gesendet, Antwort: " . json_encode($resp), 0);
         }
+    }
+
+    // ---- HTML-SDK: interaktive Kachel (Fenster + Rollladen-Animation) -----
+
+    private function RollerVisuPayload(): string
+    {
+        $lvl = (@$this->GetIDForIdent('LEVEL') !== false) ? (int) $this->GetValue('LEVEL') : 0;
+        return json_encode(['level' => $lvl]);
+    }
+
+    // An die geoeffnete Kachel senden (No-Op, wenn keine Visu offen ist)
+    private function RollerPushVisu()
+    {
+        $this->UpdateVisualizationValue($this->RollerVisuPayload());
+    }
+
+    // HTML + JS: Fenster mit herabfahrendem Rollladen; Steuerung per requestAction()
+    private function RollerVisualizationTile(): string
+    {
+        $html = <<<'HTML'
+<style>
+  .rs-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
+    padding:8px 4px;box-sizing:border-box;}
+  .rs-win{width:150px;margin:0 auto;}
+  .rs-win svg{width:150px;height:auto;display:block;}
+  .rs-state{margin-top:4px;font-size:13px;color:#c7ccd6;}
+  .rs-state b{color:#fff;}
+  .rs-btns{margin-top:8px;display:flex;gap:6px;justify-content:center;}
+  .rs-btns button{padding:6px 12px;border-radius:9px;border:none;cursor:pointer;
+    font-size:12px;font-weight:700;background:#2b2f3a;color:#e8ebf0;}
+  .rs-btns button:active{transform:scale(.94);}
+  .rs-up{color:#9ad27a;} .rs-stop{color:#ffd166;} .rs-dn{color:#7cc0ff;}
+  .rs-slider{margin-top:10px;display:flex;align-items:center;gap:8px;justify-content:center;
+    font-size:10px;color:#8a93a0;}
+  .rs-slider input{width:108px;}
+</style>
+<div class="rs-card" id="rsCard">
+  <div class="rs-win">
+    <svg viewBox="0 0 200 184">
+      <defs>
+        <linearGradient id="rsGlass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#bfe3ff"/><stop offset="100%" stop-color="#eaf6ff"/>
+        </linearGradient>
+        <linearGradient id="rsSlat" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#eceff3"/><stop offset="100%" stop-color="#c2c7cf"/>
+        </linearGradient>
+        <pattern id="rsSlats" width="92" height="9" patternUnits="userSpaceOnUse" x="54" y="22">
+          <rect width="92" height="9" fill="url(#rsSlat)"/>
+          <rect width="92" height="1.3" y="7.7" fill="#a7adb7"/>
+        </pattern>
+        <clipPath id="rsClip"><rect x="54" y="22" width="92" height="112" rx="3"/></clipPath>
+      </defs>
+      <rect x="40" y="150" width="120" height="11" rx="3" fill="#8a8f98"/>
+      <rect x="46" y="14" width="108" height="128" rx="6" fill="#727884"/>
+      <rect x="54" y="22" width="92" height="112" rx="3" fill="url(#rsGlass)"/>
+      <circle cx="126" cy="48" r="11" fill="#ffd76b" clip-path="url(#rsClip)"/>
+      <g clip-path="url(#rsClip)">
+        <g id="rsShutter" style="transition:transform .45s ease">
+          <rect x="54" y="22" width="92" height="112" fill="url(#rsSlats)"/>
+          <rect x="54" y="128" width="92" height="6" rx="1" fill="#9aa0aa"/>
+        </g>
+      </g>
+      <rect x="54" y="22" width="92" height="112" rx="3" fill="none" stroke="#5c616b" stroke-width="1.2"/>
+    </svg>
+  </div>
+  <div class="rs-state" id="rsState">–</div>
+  <div class="rs-btns">
+    <button class="rs-up"   onclick="requestAction('MOVE',0)">&#9650; Auf</button>
+    <button class="rs-stop" onclick="requestAction('MOVE',1)">&#9632; Stop</button>
+    <button class="rs-dn"   onclick="requestAction('MOVE',2)">&#9660; Zu</button>
+  </div>
+  <div class="rs-slider">
+    <span>Zu</span>
+    <input id="rsSlider" type="range" min="0" max="100" step="1"
+      oninput="rsLbl(this.value)" onchange="requestAction('LEVEL', parseInt(this.value,10))">
+    <span>Auf</span>
+  </div>
+</div>
+<script>
+  window.rsLevel = 0;
+  function rsLbl(v){ document.getElementById('rsState').innerHTML = rsTxt(parseInt(v,10)); }
+  function rsTxt(l){ return l>=99 ? '<b>Offen</b>' : (l<=1 ? '<b>Geschlossen</b>' : 'Position <b>'+l+' %</b>'); }
+  function handleMessage(message){
+    var d=(typeof message==='string')?JSON.parse(message):message;
+    var l=Math.max(0,Math.min(100,Math.round(d.level)));
+    window.rsLevel=l;
+    var H=112;
+    document.getElementById('rsShutter').style.transform='translateY('+(-(l/100)*H).toFixed(1)+'px)';
+    document.getElementById('rsState').innerHTML=rsTxt(l);
+    var sl=document.getElementById('rsSlider');
+    if(document.activeElement!==sl){ sl.value=l; }
+  }
+</script>
+HTML;
+        return $html . '<script>handleMessage(' . json_encode($this->RollerVisuPayload()) . ');</script>';
     }
 }

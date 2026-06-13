@@ -77,9 +77,10 @@ class MerossDevice extends IPSModule
             default:       $this->PlugApplyChanges();   break;
         }
 
-        // Thermostat zeigt eine eigene interaktive HTML-Kachel (HTML-SDK),
-        // alle anderen Typen die normale Variablen-Kachel.
-        $this->SetVisualizationType($this->TypeGroup($type) === 'thermostat' ? 1 : 0);
+        // Thermostat und Rollladen zeigen eine eigene interaktive HTML-Kachel
+        // (HTML-SDK), alle anderen Typen die normale Variablen-Kachel.
+        $hasTile = in_array($this->TypeGroup($type), ['thermostat', 'roller'], true);
+        $this->SetVisualizationType($hasTile ? 1 : 0);
 
         // Name aus der Cloud uebernehmen (vom Konfigurator gesetzt)
         $devName = trim($this->ReadPropertyString('DeviceName'));
@@ -100,11 +101,12 @@ class MerossDevice extends IPSModule
         $this->SetTimerInterval('MERO_Poll', $interval > 0 ? $interval * 1000 : 0);
     }
 
-    // HTML-SDK: Inhalt der eigenen Kachel (nur Thermostat liefert eine)
+    // HTML-SDK: Inhalt der eigenen Kachel (Thermostat / Rollladen)
     public function GetVisualizationTile()
     {
-        if ($this->TypeGroup($this->ReadPropertyString('DeviceType')) === 'thermostat') {
-            return $this->ThermoVisualizationTile();
+        switch ($this->TypeGroup($this->ReadPropertyString('DeviceType'))) {
+            case 'thermostat': return $this->ThermoVisualizationTile();
+            case 'roller':     return $this->RollerVisualizationTile();
         }
         return '';
     }
@@ -112,7 +114,7 @@ class MerossDevice extends IPSModule
     public function RequestAction($Ident, $Value)
     {
         switch ($this->TypeGroup($this->ReadPropertyString('DeviceType'))) {
-            case 'roller': $this->RollerRequestAction($Ident, $Value); break;
+            case 'roller': $this->RollerRequestAction($Ident, $Value); $this->RollerPushVisu(); break;
             case 'light':  $this->LightRequestAction($Ident, $Value);  break;
             case 'garage': $this->GarageRequestAction($Ident, $Value); break;
             case 'hub':    $this->HubRequestAction($Ident, $Value);    break;

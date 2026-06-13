@@ -218,15 +218,22 @@ trait ThermostatDevice
   .mt-mode{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;
     background:#2b2f3a;color:#c7ccd6;}
   .mt-mode.active{color:#10131a;}
-  .mt-power{margin-top:8px;}
+  .mt-heat{margin-top:6px;font-size:12px;font-weight:600;color:#FF6B35;height:15px;}
+  .mt-power{margin-top:6px;}
   .mt-power button{padding:4px 18px;border-radius:999px;border:none;cursor:pointer;
     font-size:12px;font-weight:700;}
 </style>
 <div class="mt-card" id="mtCard">
   <div class="mt-dial">
     <svg viewBox="0 0 200 200">
+      <defs>
+        <linearGradient id="mtGrad" x1="0" y1="1" x2="0" y2="0">
+          <stop id="mtG0" offset="0%" stop-color="#2E7CF6"/>
+          <stop id="mtG1" offset="100%" stop-color="#FF3B30"/>
+        </linearGradient>
+      </defs>
       <circle cx="100" cy="100" r="84" fill="none" stroke="#2b2f3a" stroke-width="16"/>
-      <circle id="mtRing" cx="100" cy="100" r="84" fill="none" stroke="#FFB300" stroke-width="16"
+      <circle id="mtRing" cx="100" cy="100" r="84" fill="none" stroke="url(#mtGrad)" stroke-width="16"
         stroke-linecap="round" stroke-dasharray="0 528" transform="rotate(-90 100 100)"/>
     </svg>
     <div class="mt-cur"><b id="mtCur">–</b><span>°C</span></div>
@@ -243,11 +250,18 @@ trait ThermostatDevice
     <span class="mt-mode" data-m="3" onclick="requestAction('MODE',3)">Auto</span>
     <span class="mt-mode" data-m="4" onclick="requestAction('MODE',4)">Manuell</span>
   </div>
+  <div class="mt-heat" id="mtHeat"></div>
   <div class="mt-power"><button id="mtPower" onclick="mtToggle()">…</button></div>
 </div>
 <script>
   window.mtState = {cur:0,set:20,mode:3,heat:false,on:true,min:5,max:35};
   var MT_COL = {0:'#FF7043',1:'#29B6F6',2:'#66BB6A',3:'#9E9E9E',4:'#FFB300'};
+  // Temperatur -> Farbe: blau (kalt) ueber violett zu rot (warm)
+  function mtTempCol(t,min,max){
+    var f=Math.min(1,Math.max(0,(t-min)/((max-min)||1)));
+    var h=240+120*f;            // 240=blau ... 360=rot
+    return 'hsl('+h.toFixed(0)+',72%,55%)';
+  }
   function mtStep(d){
     var s=window.mtState, v=Math.min(s.max,Math.max(s.min,s.set+d));
     v=Math.round(v*2)/2;
@@ -260,10 +274,19 @@ trait ThermostatDevice
     var C = 2*Math.PI*84;
     var span = (d.max-d.min)>0 ? (d.max-d.min) : 1;
     var frac = Math.min(1,Math.max(0,(d.set-d.min)/span));
-    var accent = !d.on ? '#556270' : (d.heat ? '#FF6B35' : (MT_COL[d.mode]||'#9E9E9E'));
     var ring = document.getElementById('mtRing');
-    ring.setAttribute('stroke', accent);
+    // Ring-Verlauf blau->rot; warmes Ende folgt der Temperatur (Soll)
+    if (d.on) {
+      document.getElementById('mtG0').setAttribute('stop-color', '#2E7CF6');
+      document.getElementById('mtG1').setAttribute('stop-color', mtTempCol(d.set, d.min, d.max));
+      ring.style.filter = d.heat ? 'drop-shadow(0 0 5px #FF6B35)' : 'none';
+    } else {
+      document.getElementById('mtG0').setAttribute('stop-color', '#556270');
+      document.getElementById('mtG1').setAttribute('stop-color', '#7a8290');
+      ring.style.filter = 'none';
+    }
     ring.setAttribute('stroke-dasharray', (frac*C).toFixed(1)+' '+C.toFixed(1));
+    document.getElementById('mtHeat').textContent = (d.on && d.heat) ? '● heizt' : '';
     document.getElementById('mtCur').textContent = d.on ? Number(d.cur).toFixed(1).replace('.',',') : '–';
     document.getElementById('mtSet').textContent = Number(d.set).toFixed(1).replace('.',',');
     var ms = document.querySelectorAll('#mtModes .mt-mode');
