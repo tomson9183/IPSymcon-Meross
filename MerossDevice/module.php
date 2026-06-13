@@ -35,6 +35,7 @@ class MerossDevice extends IPSModule
         $this->RegisterPropertyString('Uuid', '');
         $this->RegisterPropertyString('Key', '');
         $this->RegisterPropertyInteger('PollInterval', 3);
+        $this->RegisterPropertyString('VisuTheme', 'auto'); // auto|light|dark – Kachel-Darstellung
 
         $this->RegisterAttributeBoolean('LastLed', true);
 
@@ -105,7 +106,14 @@ class MerossDevice extends IPSModule
         $this->Update();
     }
 
-    // HTML-SDK: Inhalt der eigenen Kachel (Thermostat / Rollladen)
+    // CSS-Klasse für die Kachel-Darstellung (auto = prefers-color-scheme)
+    private function VisuThemeClass(): string
+    {
+        $t = $this->ReadPropertyString('VisuTheme');
+        return ($t === 'light') ? 'th-light' : (($t === 'dark') ? 'th-dark' : 'th-auto');
+    }
+
+    // HTML-SDK: Inhalt der eigenen Kachel (Thermostat / Rollladen / Steckdose)
     public function GetVisualizationTile()
     {
         $group = $this->TypeGroup($this->ReadPropertyString('DeviceType'));
@@ -207,7 +215,7 @@ class MerossDevice extends IPSModule
             'roller'     => ['MOVE', 'LEVEL'],
             'light'      => ['STATE', 'BRIGHT', 'COLOR', 'CTEMP'],
             'garage'     => ['DOOR'],
-            'thermostat' => ['TEMP', 'SET', 'ONOFF', 'HEAT', 'MODE'],
+            'thermostat' => ['TEMP', 'SET', 'ONOFF', 'HEAT', 'MODE', 'HUMI'],
         ];
         // Hub-Variablen sind dynamisch (subId-Suffix) und werden hier nicht
         // erfasst; sie bleiben beim Typwechsel ggf. stehen.

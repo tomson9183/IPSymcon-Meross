@@ -166,6 +166,34 @@ trait ThermostatDevice
             $this->SetValue('MODE', $mode);
         }
 
+        // Luftfeuchte (nur Modelle, die sie liefern, z. B. MTS215B) – per Feature-Erkennung:
+        // irgendein Feld, dessen Name "humi" enthält, oder ein verschachteltes humidity-Objekt.
+        $humi = null;
+        foreach ($d as $k => $v) {
+            if (is_numeric($v) && stripos((string) $k, 'humi') !== false) {
+                $humi = (float) $v;
+                break;
+            }
+        }
+        if ($humi === null && isset($d['humidity'])) {
+            $h = $d['humidity'];
+            if (is_array($h)) {
+                $h = $h['latest'] ?? ($h['value'] ?? ($h['current'] ?? null));
+            }
+            if ($h !== null && is_numeric($h)) {
+                $humi = (float) $h;
+            }
+        }
+        if ($humi !== null) {
+            if ($humi > 100) {
+                $humi = $humi / 10.0; // Zehntel-Prozent -> Prozent
+            }
+            if (@$this->GetIDForIdent('HUMI') === false) {
+                $this->RegisterVariableFloat('HUMI', $this->Translate('Luftfeuchte'), '~Humidity.F', 25);
+            }
+            $this->SetValue('HUMI', round($humi, 1));
+        }
+
         // Kachel live aktualisieren
         $this->ThermoPushVisu();
     }
@@ -178,12 +206,14 @@ trait ThermostatDevice
         $get = function (string $id, $fallback) {
             return (@$this->GetIDForIdent($id) !== false) ? $this->GetValue($id) : $fallback;
         };
+        $humi = (@$this->GetIDForIdent('HUMI') !== false) ? round((float) $this->GetValue('HUMI'), 1) : null;
         return json_encode([
             'cur'  => (float) $get('TEMP', 0.0),
             'set'  => (float) $get('SET', 20.0),
             'mode' => (int) $get('MODE', 3),
             'heat' => (bool) $get('HEAT', false),
             'on'   => (bool) $get('ONOFF', true),
+            'humi' => $humi,
             'min'  => 5,
             'max'  => 35,
         ]);
@@ -201,15 +231,22 @@ trait ThermostatDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
-  /* Theme-adaptive Farben (passt sich Hell/Dunkel der Visu an) */
-  :root{ --num:#ffffff; --txt:#c7ccd6; --sub:#9aa3b2; --chip:#2b2f3a; --chiptx:#c7ccd6; --track:#2b2f3a; }
+  /* Theme: Dunkel (Default) / Hell / Automatisch (System) */
+  .thbox{ --num:#ffffff; --txt:#c7ccd6; --sub:#9aa3b2; --chip:#2b2f3a; --chiptx:#c7ccd6; --track:#2b2f3a; }
   @media (prefers-color-scheme: light){
-    :root{ --num:#13202b; --txt:#3a4753; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; --track:#dde2e9; }
+    .thbox.th-auto{ --num:#13202b; --txt:#3a4753; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; --track:#dde2e9; }
   }
+  .thbox.th-light{ --num:#13202b; --txt:#3a4753; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; --track:#dde2e9; }
+  .thbox.th-dark{ --num:#ffffff; --txt:#c7ccd6; --sub:#9aa3b2; --chip:#2b2f3a; --chiptx:#c7ccd6; --track:#2b2f3a; }
   #mtBox{position:relative;width:100%;overflow:hidden;}
   .mt-card{position:absolute;left:50%;top:50%;transform-origin:center center;
     font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--txt);text-align:center;
     width:240px;box-sizing:border-box;padding:6px;background:transparent;}
+  .mt-name{font-size:15px;font-weight:700;color:var(--num);margin-bottom:4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mt-humi{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 11px;
+    border-radius:999px;background:var(--chip);color:var(--num);font-size:12px;font-weight:600;}
+  .mt-humi svg{width:11px;height:14px;display:block;}
   .mt-dial{position:relative;width:100%;margin:0 auto;}
   .mt-dial svg{width:100%;height:auto;display:block;}
   .mt-track{stroke:var(--track);}
@@ -231,7 +268,8 @@ trait ThermostatDevice
   .mt-power button{padding:5px 20px;border-radius:999px;border:none;cursor:pointer;
     font-size:13px;font-weight:700;}
 </style>
-<div id="mtBox"><div class="mt-card" id="mtCard">
+<div id="mtBox" class="thbox __THEME__"><div class="mt-card" id="mtCard">
+  <div class="mt-name">__NAME__</div>
   <div class="mt-dial">
     <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
       <defs>
@@ -251,12 +289,14 @@ trait ThermostatDevice
     <span class="mt-set">Soll <b id="mtSet">–</b> °C</span>
     <button class="mt-step" onclick="mtStep(0.5)">+</button>
   </div>
+  <div class="mt-humi" id="mtHumi" style="display:none">
+    <svg viewBox="0 0 11 14"><path d="M5.5 0 C8.3 4 11 6.6 11 9.5 A5.5 5.5 0 1 1 0 9.5 C0 6.6 2.7 4 5.5 0 Z" fill="#29B6F6"/></svg>
+    <span id="mtHumiV">–</span>
+  </div>
   <div class="mt-modes" id="mtModes">
     <span class="mt-mode" data-m="0" onclick="requestAction('MODE',0)">Heizen</span>
     <span class="mt-mode" data-m="1" onclick="requestAction('MODE',1)">Kühlen</span>
     <span class="mt-mode" data-m="2" onclick="requestAction('MODE',2)">Eco</span>
-    <span class="mt-mode" data-m="3" onclick="requestAction('MODE',3)">Auto</span>
-    <span class="mt-mode" data-m="4" onclick="requestAction('MODE',4)">Manuell</span>
   </div>
   <div class="mt-power"><button id="mtPower" onclick="mtToggle()">…</button></div>
 </div></div>
@@ -287,6 +327,10 @@ trait ThermostatDevice
     // Werte zuerst setzen (HTML-Overlay -> in jedem Browser sichtbar, auch beim Skalieren)
     document.getElementById('mtCur').textContent = Number(d.cur).toFixed(1).replace('.',',');
     document.getElementById('mtSet').textContent = Number(d.set).toFixed(1).replace('.',',');
+    var hu=document.getElementById('mtHumi');
+    if (d.humi!==null && d.humi!==undefined){ hu.style.display='inline-flex';
+      document.getElementById('mtHumiV').textContent=Number(d.humi).toFixed(0)+' %'; }
+    else { hu.style.display='none'; }
     var heatEl = document.getElementById('mtHeat');
     if (!d.on){ heatEl.textContent='aus'; heatEl.style.color='#7a8290'; }
     else if (d.heat){ heatEl.textContent='● heizt'; heatEl.style.color='#FF6B35'; }
@@ -334,6 +378,10 @@ trait ThermostatDevice
   window.addEventListener('load', function(){ mtFit(); setTimeout(mtFit,80); setTimeout(mtFit,300); });
 </script>
 HTML;
+        $html = strtr($html, [
+            '__THEME__' => $this->VisuThemeClass(),
+            '__NAME__'  => htmlspecialchars(IPS_GetName($this->InstanceID), ENT_QUOTES),
+        ]);
         return $html . '<script>try{handleMessage(' . json_encode($this->ThermoVisuPayload()) . ');}catch(e){}</script>';
     }
 }

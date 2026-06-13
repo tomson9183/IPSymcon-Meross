@@ -175,14 +175,18 @@ trait PlugDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
-  :root{ --num:#ffffff; --sub:#8a93a0; --chip:#2b2f3a; --chiptx:#cfd4dd; }
+  .thbox{ --num:#ffffff; --sub:#8a93a0; --chip:#2b2f3a; --chiptx:#cfd4dd; }
   @media (prefers-color-scheme: light){
-    :root{ --num:#13202b; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; }
+    .thbox.th-auto{ --num:#13202b; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; }
   }
+  .thbox.th-light{ --num:#13202b; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; }
+  .thbox.th-dark{ --num:#ffffff; --sub:#8a93a0; --chip:#2b2f3a; --chiptx:#cfd4dd; }
   #pgBox{position:relative;width:100%;overflow:hidden;}
   .pg-card{position:absolute;left:50%;top:50%;transform-origin:center center;
     font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--chiptx);text-align:center;
     width:250px;box-sizing:border-box;padding:6px;background:transparent;}
+  .pg-name{font-size:15px;font-weight:700;color:var(--num);margin-bottom:4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .pg-ico{width:100%;max-width:104px;margin:0 auto;}
   .pg-ico svg{width:100%;height:auto;display:block;}
   .pg-ch{margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
@@ -195,7 +199,8 @@ trait PlugDevice
   .pg-m b{display:block;font-size:15px;color:var(--num);font-weight:700;}
   .pg-m span{color:var(--sub);font-size:10px;}
 </style>
-<div id="pgBox"><div class="pg-card" id="pgCard">
+<div id="pgBox" class="thbox __THEME__"><div class="pg-card" id="pgCard">
+  <div class="pg-name">__NAME__</div>
   <div class="pg-ico">
     <svg viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet">
       <circle id="pgGlow" cx="60" cy="60" r="46" fill="none" stroke="#2b2f3a" stroke-width="10"/>
@@ -249,6 +254,10 @@ trait PlugDevice
   window.addEventListener('load', function(){ pgFit(); setTimeout(pgFit,80); setTimeout(pgFit,300); });
 </script>
 HTML;
+        $html = strtr($html, [
+            '__THEME__' => $this->VisuThemeClass(),
+            '__NAME__'  => htmlspecialchars(IPS_GetName($this->InstanceID), ENT_QUOTES),
+        ]);
         return $html . '<script>try{handleMessage(' . json_encode($this->PlugVisuPayload()) . ');}catch(e){}</script>';
     }
 }

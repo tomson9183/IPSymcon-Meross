@@ -36,6 +36,16 @@
             "name": "PollInterval",
             "caption": "Status alle … Sekunden abfragen (0 = aus, Standard 3)",
             "suffix": "s"
+        },
+        {
+            "type": "Select",
+            "name": "VisuTheme",
+            "caption": "Kachel-Darstellung",
+            "options": [
+                { "caption": "Automatisch (System)", "value": "auto" },
+                { "caption": "Hell", "value": "light" },
+                { "caption": "Dunkel", "value": "dark" }
+            ]
         }
     ],
     "actions": [

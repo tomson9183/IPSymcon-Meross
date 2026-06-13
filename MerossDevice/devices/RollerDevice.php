@@ -269,14 +269,18 @@ trait RollerDevice
         $html = <<<'HTML'
 <style>
   html,body{margin:0;padding:0;overflow:hidden;}
-  :root{ --num:#ffffff; --txt:#c7ccd6; --sub:#8a93a0; --chip:#2b2f3a; --chiptx:#e8ebf0; }
+  .thbox{ --num:#ffffff; --txt:#c7ccd6; --sub:#8a93a0; --chip:#2b2f3a; --chiptx:#e8ebf0; }
   @media (prefers-color-scheme: light){
-    :root{ --num:#13202b; --txt:#3a4753; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; }
+    .thbox.th-auto{ --num:#13202b; --txt:#3a4753; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; }
   }
+  .thbox.th-light{ --num:#13202b; --txt:#3a4753; --sub:#6b7782; --chip:#e6eaf0; --chiptx:#3a4753; }
+  .thbox.th-dark{ --num:#ffffff; --txt:#c7ccd6; --sub:#8a93a0; --chip:#2b2f3a; --chiptx:#e8ebf0; }
   #rsBox{position:relative;width:100%;overflow:hidden;}
   .rs-card{position:absolute;left:50%;top:50%;transform-origin:center center;
     font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--txt);text-align:center;
     width:220px;box-sizing:border-box;padding:6px;background:transparent;}
+  .rs-name{font-size:15px;font-weight:700;color:var(--num);margin-bottom:4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rs-win{width:100%;margin:0 auto;}
   .rs-win svg{width:100%;height:auto;display:block;}
   .rs-state{margin-top:6px;font-size:13px;color:var(--txt);}
@@ -290,7 +294,8 @@ trait RollerDevice
     font-size:10px;color:var(--sub);}
   .rs-slider input{width:108px;}
 </style>
-<div id="rsBox"><div class="rs-card" id="rsCard">
+<div id="rsBox" class="thbox __THEME__"><div class="rs-card" id="rsCard">
+  <div class="rs-name">__NAME__</div>
   <div class="rs-win">
     <svg viewBox="0 0 200 184" preserveAspectRatio="xMidYMid meet">
       <defs>
@@ -362,6 +367,10 @@ trait RollerDevice
   window.addEventListener('load', function(){ rsFit(); setTimeout(rsFit,80); setTimeout(rsFit,300); });
 </script>
 HTML;
+        $html = strtr($html, [
+            '__THEME__' => $this->VisuThemeClass(),
+            '__NAME__'  => htmlspecialchars(IPS_GetName($this->InstanceID), ENT_QUOTES),
+        ]);
         return $html . '<script>try{handleMessage(' . json_encode($this->RollerVisuPayload()) . ');}catch(e){}</script>';
     }
 }
