@@ -200,9 +200,10 @@ trait ThermostatDevice
     {
         $html = <<<'HTML'
 <style>
-  body{margin:0;}
+  html,body{margin:0;padding:0;overflow:hidden;}
+  body{text-align:center;}
   .mt-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:100%;max-width:300px;margin:0 auto;box-sizing:border-box;padding:8px 6px;}
+    display:inline-block;width:240px;box-sizing:border-box;padding:8px 6px;transform-origin:top center;}
   .mt-dial{width:100%;margin:0 auto;}
   .mt-dial svg{width:100%;height:auto;display:block;}
   .mt-steps{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:8px;flex-wrap:wrap;}
@@ -306,7 +307,21 @@ trait ThermostatDevice
     pw.style.background = d.on ? '#00C853' : '#444a57';
     pw.style.color = d.on ? '#08210f' : '#cfd4dd';
     document.getElementById('mtCard').style.opacity = d.on ? '1' : '0.9';
+    mtFit();
   }
+  // Inhalt passgenau auf die Kachel (iframe) skalieren: waechst/schrumpft mit der
+  // eingestellten Kachelgroesse, kein Scrollen. Misst window.inner* (=Kachelgroesse).
+  function mtFit(){
+    var c=document.getElementById('mtCard'); if(!c) return;
+    c.style.marginTop='0'; c.style.transform='none';
+    var w=window.innerWidth||1, h=window.innerHeight||1;
+    var s=Math.min(w/(c.offsetWidth||1), h/(c.offsetHeight||1));
+    if(!isFinite(s)||s<=0) s=1;
+    c.style.transform='scale('+s+')';
+    var top=(h-c.offsetHeight*s)/2; c.style.marginTop=(top>0?top:0)+'px';
+  }
+  window.addEventListener('resize', mtFit);
+  window.addEventListener('load', function(){ mtFit(); setTimeout(mtFit,80); setTimeout(mtFit,300); });
 </script>
 HTML;
         return $html . '<script>try{handleMessage(' . json_encode($this->ThermoVisuPayload()) . ');}catch(e){}</script>';

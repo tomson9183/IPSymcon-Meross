@@ -174,9 +174,10 @@ trait PlugDevice
     {
         $html = <<<'HTML'
 <style>
-  body{margin:0;}
+  html,body{margin:0;padding:0;overflow:hidden;}
+  body{text-align:center;}
   .pg-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:100%;max-width:260px;margin:0 auto;box-sizing:border-box;padding:10px 8px;}
+    display:inline-block;width:250px;box-sizing:border-box;padding:10px 8px;transform-origin:top center;}
   .pg-ico{width:100%;max-width:104px;margin:0 auto;}
   .pg-ico svg{width:100%;height:auto;display:block;}
   .pg-ch{margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
@@ -226,7 +227,20 @@ trait PlugDevice
     function add(v,lbl,dec){ if(v!==null&&v!==undefined){ m+='<div class="pg-m"><b>'+Number(v).toFixed(dec).replace('.',',')+'</b><span>'+lbl+'</span></div>'; } }
     add(d.power,'Watt',1); add(d.voltage,'Volt',1); add(d.current,'Ampere',2); add(d.energy,'kWh heute',3);
     document.getElementById('pgMetrics').innerHTML=m;
+    pgFit();
   }
+  // Inhalt passgenau auf die Kachel (iframe) skalieren (waechst/schrumpft mit, kein Scrollen)
+  function pgFit(){
+    var c=document.getElementById('pgCard'); if(!c) return;
+    c.style.marginTop='0'; c.style.transform='none';
+    var w=window.innerWidth||1, h=window.innerHeight||1;
+    var s=Math.min(w/(c.offsetWidth||1), h/(c.offsetHeight||1));
+    if(!isFinite(s)||s<=0) s=1;
+    c.style.transform='scale('+s+')';
+    var top=(h-c.offsetHeight*s)/2; c.style.marginTop=(top>0?top:0)+'px';
+  }
+  window.addEventListener('resize', pgFit);
+  window.addEventListener('load', function(){ pgFit(); setTimeout(pgFit,80); setTimeout(pgFit,300); });
 </script>
 HTML;
         return $html . '<script>try{handleMessage(' . json_encode($this->PlugVisuPayload()) . ');}catch(e){}</script>';

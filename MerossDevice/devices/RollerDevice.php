@@ -268,9 +268,10 @@ trait RollerDevice
     {
         $html = <<<'HTML'
 <style>
-  body{margin:0;}
+  html,body{margin:0;padding:0;overflow:hidden;}
+  body{text-align:center;}
   .rs-card{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#e8ebf0;text-align:center;
-    width:100%;max-width:230px;margin:0 auto;box-sizing:border-box;padding:8px 6px;}
+    display:inline-block;width:220px;box-sizing:border-box;padding:8px 6px;transform-origin:top center;}
   .rs-win{width:100%;margin:0 auto;}
   .rs-win svg{width:100%;height:auto;display:block;}
   .rs-state{margin-top:4px;font-size:13px;color:#c7ccd6;}
@@ -339,7 +340,20 @@ trait RollerDevice
     document.getElementById('rsState').innerHTML=rsTxt(l);
     var sl=document.getElementById('rsSlider');
     if(document.activeElement!==sl){ sl.value=l; }
+    rsFit();
   }
+  // Inhalt passgenau auf die Kachel (iframe) skalieren (waechst/schrumpft mit, kein Scrollen)
+  function rsFit(){
+    var c=document.getElementById('rsCard'); if(!c) return;
+    c.style.marginTop='0'; c.style.transform='none';
+    var w=window.innerWidth||1, h=window.innerHeight||1;
+    var s=Math.min(w/(c.offsetWidth||1), h/(c.offsetHeight||1));
+    if(!isFinite(s)||s<=0) s=1;
+    c.style.transform='scale('+s+')';
+    var top=(h-c.offsetHeight*s)/2; c.style.marginTop=(top>0?top:0)+'px';
+  }
+  window.addEventListener('resize', rsFit);
+  window.addEventListener('load', function(){ rsFit(); setTimeout(rsFit,80); setTimeout(rsFit,300); });
 </script>
 HTML;
         return $html . '<script>try{handleMessage(' . json_encode($this->RollerVisuPayload()) . ');}catch(e){}</script>';
