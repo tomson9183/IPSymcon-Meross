@@ -34,7 +34,7 @@
         {
             "type": "NumberSpinner",
             "name": "PollInterval",
-            "caption": "Status alle … Sekunden abfragen (0 = aus)",
+            "caption": "Status alle … Sekunden abfragen (0 = aus, Standard 3)",
             "suffix": "s"
         }
     ],
