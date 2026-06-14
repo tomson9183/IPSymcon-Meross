@@ -1,76 +1,110 @@
-# IPSymcon-Meross
+# Meross für IP-Symcon
 
-IP-Symcon-Modul zur **lokalen** Steuerung von Meross-Geräten über das LAN.
-Die Meross-Cloud wird nur **einmalig** zum Auflisten der Geräte (und zum
-automatischen Holen von Konto-Key und lokaler IP) genutzt – im Betrieb läuft
-alles lokal: kein MQTT, kein Dauer-Cloud-Zwang, kein Python.
+Inoffizielles Community-Modul zur **lokalen** Steuerung von Meross-Geräten über das
+LAN. Die Meross-Cloud wird **nur einmalig** beim Einrichten genutzt (Geräteliste,
+Konto-Key und lokale IPs holen) – im Betrieb läuft alles lokal: **kein MQTT, kein
+Dauer-Cloud-Zwang, kein Python**.
 
-## Unterstützte Geräte & Dateien
+> Dieses Projekt steht in **keiner Verbindung** zu Meross oder zu Symcon. „Meross",
+> „IP-Symcon"/„Symcon" sind Marken der jeweiligen Inhaber und werden hier nur zur
+> Beschreibung der Kompatibilität genannt.
 
-Viele Meross-Modelle teilen sich denselben Steuer-Befehl. Daher ist je
-**Steuer-Typ** eine Datei zuständig (im Ordner `MerossDevice/devices/`):
+## Funktionsumfang
+- Lokale Steuerung per signiertem HTTP an `http://<geräte-ip>/config`, Status per Polling.
+- **Konfigurator**: erkennt deine Geräte automatisch aus der Cloud und legt die
+  passenden Instanzen an (Key und IP vorausgefüllt).
+- **Schöne, interaktive Kachel-Visualisierungen** (HTML-SDK) für Thermostat,
+  Rollladen und Steckdose – skalieren mit der Kachelgröße, Hell-/Dunkel-Modus.
 
-| Modelle | Typ | Datei | Status |
-|---|---|---|---|
-| MSS110, MSS210, MSS210P, MSS310, MSS310H, MSS420F, MSS425E, MSS510, MSS550, MSS570, MSS620, MSS710 | Steckdose / Schalter / Leiste (bis 6 Kanäle) | `PlugDevice.php` | MSS210P getestet |
-| MSL100, MSL120, MSL320, MSL420, MSL430, MSS560 | Lampe / Dimmer / LED (An/Aus, Helligkeit, Farbe, Farbtemperatur) | `Light_MSL_MSS560.php` | dokumentiert, zu testen |
-| MRS100 | Rollladen | `RollerDevice.php` | getestet |
-| MSG100, MSG200 | Garagentoröffner | `Garage_MSG100_MSG200.php` | dokumentiert, zu testen |
-| MSH300 (+ Unter-Geräte MS100, MS200, MTS100, MTS150) | Hub mit Sensoren & Thermostat-Ventilen | `Hub_MSH300.php` | dokumentiert, zu testen |
-| MTS200, MTS200B, MTS215B, MTS960 | Eigenständiger WLAN-Thermostat | `Thermostat_MTS200_MTS215B_MTS960.php` | dokumentiert, zu testen |
+## Unterstützte Geräte
 
-Der **Konfigurator** erkennt den Typ automatisch anhand der Modellnummer und
-legt die passende Instanz an. Unbekannte ToggleX-Geräte landen auf der
-getesteten Steckdosen-Logik. „getestet" = an echter Hardware bestätigt;
-„dokumentiert, zu testen" = nach offiziellem/Community-Protokoll gebaut, am
-eigenen Gerät bitte prüfen.
+| Modelle | Typ | Status |
+|---|---|---|
+| MSS110, MSS210, MSS210P, MSS310, MSS310H, MSS420F, MSS425E, MSS510, MSS550, MSS570, MSS620, MSS710 | Steckdose / Schalter / Leiste (bis 6 Kanäle, inkl. Messwerte) | MSS210P getestet |
+| MRS100 | Rollladen | getestet |
+| MTS200, MTS200B, MTS215B, MTS960 | Eigenständiger WLAN-Thermostat | MTS200/215B getestet |
+| MSL100, MSL120, MSL320, MSL420, MSL430, MSS560 | Lampe / Dimmer / LED (An/Aus, Helligkeit, Farbe, Farbtemperatur) | dokumentiert, zu testen |
+| MSG100, MSG200 | Garagentoröffner | dokumentiert, zu testen |
+| MSH300 (+ MS100, MS200, MTS100, MTS150) | Hub mit Sensoren & Thermostat-Ventilen | dokumentiert, zu testen |
+
+„getestet" = an echter Hardware bestätigt; „dokumentiert, zu testen" = nach
+offiziellem/Community-Protokoll umgesetzt, am eigenen Gerät bitte prüfen.
+
+## Voraussetzungen
+- IP-Symcon **ab Version 8.0**.
+- Meross-Geräte im selben lokalen Netz; **feste IP** (z. B. in der Fritzbox) empfohlen.
+- Meross-Konto (E-Mail + Passwort) für den einmaligen Geräte-Abruf.
+
+## Installation
+1. In IP-Symcon die Kerninstanz **„Modules"** öffnen (Verwaltungskonsole →
+   Kerninstanzen), unten rechts **+**, Repository-URL eintragen:
+   `https://github.com/tomson9183/IPSymcon-Meross` – mit **OK** bestätigen und die
+   Konsole neu verbinden. (Alternativ über den Module Store, sobald gelistet.)
+
+## Konfiguration
+1. Neue Instanz **„Meross Konfigurator"** anlegen.
+2. Meross **E-Mail + Passwort** eintragen, **Region** wählen, **Übernehmen**.
+3. **„Geräte aus der Cloud laden"** – holt Konto-Key, Geräteliste und sucht die
+   lokalen IPs. (Nur hier erfolgt eine Cloud-Anmeldung; bei 2FA Code eintragen und
+   erneut laden.)
+4. Geräte mit **„Hinzufügen"** anlegen – Key und IP sind vorausgefüllt. Danach läuft
+   die Steuerung **komplett lokal**.
+
+**Geräte-Instanz** – Einstellungen: Lokale IP, Konto-Key (automatisch), Poll-Intervall
+(Standard 3 s, 0 = aus) und **Kachel-Darstellung** (Automatisch / Hell / Dunkel).
+
+### Wenn keine lokale IP gefunden wird
+- Im Konfigurator das **Subnetz** eintragen (z. B. `192.168.178`) und „Lokale IPs
+  erneut suchen".
+- Oder dem Gerät im Router eine **feste IP** geben und sie im Gerät unter „Lokale IP
+  des Geräts" eintragen.
+
+## Visualisierung
+Thermostat, Rollladen und Steckdose haben eine eigene **interaktive Kachel** (rundes
+Thermostat-Dial mit Soll-Tippern/Modus, Rollladen-Fenster mit Auf/Stop/Zu + Slider,
+Steckdose mit Schalter + Messwerten). Die Kacheln **skalieren mit der eingestellten
+Kachelgröße** und passen sich **Hell-/Dunkel-Theme** an (umstellbar je Instanz).
 
 ### Hinweis Luftfeuchte (MTS215B / Matter)
-Der **MTS215B** ist ein **Matter-Thermostat** und gibt die **Luftfeuchtigkeit
-nicht über die lokale HTTP-Schnittstelle** heraus – er meldet sie ausschließlich
-über Matter bzw. die Meross-Cloud. In der lokalen Visualisierung wird die Feuchte
-bei diesem Modell daher **nicht** angezeigt (Temperatur, Soll, Modus, Heizstatus
-funktionieren normal). Modelle, die die Feuchte lokal liefern, zeigen sie
-automatisch an.
-
-## Installation (Kurzfassung)
-
-1. In IP-Symcon: Kerninstanz **Modules** öffnen (unten rechts **+**), dieses
-   GitHub-Repo hinzufügen, Konsole neu verbinden.
-2. Instanz **„Meross Konfigurator"** anlegen, Meross E-Mail + Passwort
-   eintragen, **„Übernehmen"**.
-3. **„Geräte aus der Cloud laden"** – holt Konto-Key, Geräteliste und die
-   lokalen IPs automatisch. (Nur dann erfolgt eine Cloud-Anmeldung.)
-4. Geräte mit **„Hinzufügen"** anlegen – Key und IP sind vorausgefüllt.
-   Fertig – die Steuerung läuft danach komplett lokal.
-
-Eine ausführliche Schritt-für-Schritt-Anleitung liegt als PDF bei.
+Der **MTS215B** ist ein **Matter-Thermostat** und gibt die **Luftfeuchtigkeit nicht
+über die lokale HTTP-Schnittstelle** heraus (nur über Matter/Cloud). Sie wird daher
+bei diesem Modell lokal **nicht** angezeigt – Temperatur, Soll, Modus und Heizstatus
+funktionieren normal. Modelle, die die Feuchte lokal liefern, zeigen sie automatisch.
 
 ## Hinweis Cloud-Sperre
-Möglichst selten in der Cloud anmelden. Bei zu häufigen Anmeldungen sperrt
-Meross das Konto vorübergehend (ca. 5 Stunden). Der Konfigurator meldet sich
-nur per Knopfdruck an, die Geräte-Instanzen selbst nie.
+Möglichst selten in der Cloud anmelden: Bei zu häufigen Anmeldungen sperrt Meross das
+Konto vorübergehend (ca. 5 Stunden). Der Konfigurator meldet sich **nur per Knopfdruck**
+an; die Geräte-Instanzen selbst **nie**.
+
+## Fehlerbehebung
+- **„Gerät lokal nicht erreichbar" (Status 201):** IP korrekt? Gerät im selben Netz?
+  Feste IP vergeben.
+- **„Kein Konto-Key / keine IP" (202):** Gerät über den Konfigurator anlegen oder Key/IP
+  manuell eintragen.
+- **Kachel leer / falsch skaliert:** Im Browser Visu neu laden; Modul auf die neueste
+  Version aktualisieren; ggf. „Kachel-Darstellung" fest auf Hell/Dunkel stellen.
 
 ## Rechtliche Hinweise / Haftungsausschluss
-- **Inoffiziell:** Dieses Projekt ist ein freies Community-Modul und steht in **keiner
-  Verbindung** zu Meross bzw. der Chengdu Meross Technology Co., Ltd. und wird von
-  dieser **nicht unterstützt oder geprüft**. „Meross" sowie Modellbezeichnungen sind
-  Marken der jeweiligen Inhaber und werden hier nur zur **Beschreibung der
-  Kompatibilität** genannt (nominative Nutzung).
-- **Keine Gewähr / Haftung:** Die Nutzung erfolgt **auf eigene Gefahr**. Das Modul wird
-  „wie besehen" ohne jede Gewährleistung bereitgestellt (siehe LICENSE/MIT). Eine
-  Haftung für Schäden, Fehlfunktionen oder Datenverlust ist – soweit gesetzlich
+- **Inoffiziell:** Freies Community-Modul, **keine Verbindung** zu Meross (Chengdu Meross
+  Technology Co., Ltd.) oder zu Symcon und von diesen **nicht unterstützt/geprüft**.
+  „Meross", „IP-Symcon"/„Symcon" und Modellbezeichnungen sind Marken der jeweiligen
+  Inhaber (Nennung nur zur Kompatibilitätsbeschreibung, nominative Nutzung).
+- **Reverse Engineering / Meross-Nutzungsbedingungen:** Die genutzte Geräte-/Cloud-
+  Schnittstelle wurde durch die Community dokumentiert. Die [Meross-Nutzungsbedingungen](https://www.meross.com/en-gc/terms-of-use)
+  untersagen Reverse Engineering bzw. das Umgehen von Zugriffsmaßnahmen grundsätzlich
+  (mit Ausnahmen „soweit gesetzlich zulässig"). Dieses Modul dient ausschließlich der
+  **privaten, nicht-kommerziellen Interoperabilität** mit **eigenen Geräten** und
+  **eigenen Zugangsdaten**; in der EU bestehen gesetzliche Interoperabilitäts-Ausnahmen
+  (RL 2009/24/EG, § 69e UrhG). Eine Kollision mit den Meross-AGB ist dennoch nicht
+  vollständig auszuschließen – **Nutzung auf eigenes Risiko**.
+- **Keine Gewähr / Haftung:** Bereitstellung „wie besehen" ohne Gewährleistung (siehe
+  LICENSE/MIT). Haftung für Schäden/Fehlfunktionen/Datenverlust – soweit gesetzlich
   zulässig – ausgeschlossen. Das gilt besonders für **sicherheitsrelevante Geräte**
-  (z. B. Garagentor, Heizung/Thermostat): Funktion und gefahrlose Bedienung sind
-  eigenverantwortlich zu prüfen.
-- **Lokale Schnittstelle:** Die Steuerung nutzt eine **inoffizielle, aus der
-  Community dokumentierte Geräte-Schnittstelle**. Die einmalige Cloud-Anmeldung dient
-  ausschließlich dem Abruf der **eigenen** Geräteliste, des Konto-Keys und der lokalen
-  IPs mit den **eigenen Zugangsdaten** des Nutzers. Bitte die Nutzungsbedingungen von
-  Meross beachten.
+  (Garagentor, Heizung/Thermostat): Funktion und gefahrlose Bedienung eigenverantwortlich
+  prüfen.
 - **Daten:** Zugangsdaten und Konto-Key verbleiben in der eigenen IP-Symcon-Installation;
   das Modul gibt sie nicht an Dritte weiter.
-- Diese Hinweise sind keine Rechtsberatung.
+- Diese Hinweise sind **keine Rechtsberatung**.
 
 ## Lizenz
-MIT – siehe LICENSE.
+MIT – siehe [LICENSE](LICENSE).
