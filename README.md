@@ -25,6 +25,14 @@ getesteten Steckdosen-Logik. „getestet" = an echter Hardware bestätigt;
 „dokumentiert, zu testen" = nach offiziellem/Community-Protokoll gebaut, am
 eigenen Gerät bitte prüfen.
 
+### Hinweis Luftfeuchte (MTS215B / Matter)
+Der **MTS215B** ist ein **Matter-Thermostat** und gibt die **Luftfeuchtigkeit
+nicht über die lokale HTTP-Schnittstelle** heraus – er meldet sie ausschließlich
+über Matter bzw. die Meross-Cloud. In der lokalen Visualisierung wird die Feuchte
+bei diesem Modell daher **nicht** angezeigt (Temperatur, Soll, Modus, Heizstatus
+funktionieren normal). Modelle, die die Feuchte lokal liefern, zeigen sie
+automatisch an.
+
 ## Installation (Kurzfassung)
 
 1. In IP-Symcon: Kerninstanz **Modules** öffnen (unten rechts **+**), dieses

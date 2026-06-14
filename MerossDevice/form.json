@@ -53,11 +53,6 @@
             "type": "Button",
             "caption": "Status jetzt abrufen",
             "onClick": "MERO_Update($id);"
-        },
-        {
-            "type": "Button",
-            "caption": "Thermostat-Diagnose (Felder ins Debug)",
-            "onClick": "MERO_ThermoDiag($id);"
         }
     ],
     "status": [
