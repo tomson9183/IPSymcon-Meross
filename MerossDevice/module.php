@@ -290,18 +290,18 @@ class MerossDevice extends IPSModule
         $sl = $this->LocalRequest('Appliance.Control.Sensor.Latest', 'GET', []);
         $lines[] = '=== Appliance.Control.Sensor.Latest (direkt) ===';
         $lines[] = ($sl === null) ? 'keine Antwort' : json_encode($sl['payload'] ?? null);
-        $slm = $this->LocalRequestMultiple('Appliance.Control.Sensor.Latest', [
+        // Entscheidender Test: signiertes Multiple MIT System.All (das beantwortet
+        // das Gerät einzeln). Antwortet das Bündel -> Multiple funktioniert; sonst
+        // blockt das Gerät Appliance.Control.Multiple komplett.
+        $mtest = $this->LocalRequestMultipleRaw([
+            ['Appliance.System.All', 'GET', []],
             ['Appliance.Control.Sensor.Latest', 'GET', []],
+            ['Appliance.Control.Thermostat.Sensor', 'GET', []],
         ]);
-        $lines[] = '=== Sensor.Latest via Multiple ===';
-        $lines[] = ($slm === null) ? 'keine Antwort' : json_encode($slm);
-        // Zusatz: kompletter Multiple-Roh-Dump (System.All + Sensor.Latest + Thermostat.Sensor)
-        $multiRaw = $this->LocalRequest('Appliance.Control.Multiple', 'GET', ['multiple' => [
-            ['header' => ['messageId' => md5(uniqid('', true)), 'method' => 'GET', 'namespace' => 'Appliance.Control.Sensor.Latest'], 'payload' => new stdClass()],
-            ['header' => ['messageId' => md5(uniqid('', true)), 'method' => 'GET', 'namespace' => 'Appliance.Control.Thermostat.Sensor'], 'payload' => new stdClass()],
-        ]]);
-        $lines[] = '=== Multiple-Roh (GET) ===';
-        $lines[] = ($multiRaw === null) ? 'keine Antwort' : json_encode($multiRaw['payload'] ?? null);
+        $lines[] = '=== Multiple-Test (signiert, mit System.All) ===';
+        $lines[] = ($mtest === null)
+            ? 'keine Antwort -> Geraet blockt Appliance.Control.Multiple komplett (Feuchte lokal nicht abrufbar)'
+            : json_encode($mtest['payload'] ?? null);
         $lines[] = '';
 
         // 3) Die gefundenen Thermostat-Namespaces roh auslesen
@@ -384,19 +384,31 @@ class MerossDevice extends IPSModule
         return is_array($decoded) ? $decoded : null;
     }
 
-    // Mehrere Abfragen gebündelt über Appliance.Control.Multiple. Manche (Matter-)
-    // Geräte (z. B. MTS215B) antworten auf einzelne GETs NICHT, wohl aber im Bündel.
-    // $subs: Liste von [namespace, method, payload]. Liefert für den gesuchten
-    // Namespace das Sub-Payload (oder null).
-    private function LocalRequestMultiple(string $wantNamespace, array $subs)
+    // Mehrere Abfragen gebündelt über Appliance.Control.Multiple. Liefert die
+    // komplette Antwort (oder null). Sub-Header werden voll signiert (manche
+    // Matter-Geräte verlangen das). $subs: Liste von [namespace, method, payload].
+    private function LocalRequestMultipleRaw(array $subs)
     {
+        $host = $this->ReadPropertyString('Host');
+        $key  = $this->ReadPropertyString('Key');
+        if ($host === '' || $key === '') {
+            return null;
+        }
+        $from = 'http://' . $host . '/config';
         $multiple = [];
         foreach ($subs as $s) {
+            $mid = md5(uniqid('', true));
+            $ts  = time();
             $multiple[] = [
                 'header'  => [
-                    'messageId' => md5(uniqid('', true)),
-                    'method'    => $s[1],
-                    'namespace' => $s[0],
+                    'messageId'      => $mid,
+                    'namespace'      => $s[0],
+                    'method'         => $s[1],
+                    'payloadVersion' => 1,
+                    'from'           => $from,
+                    'timestamp'      => $ts,
+                    'timestampMs'    => 0,
+                    'sign'           => md5($mid . $key . $ts),
                 ],
                 'payload' => empty($s[2]) ? new stdClass() : $s[2],
             ];
@@ -404,18 +416,21 @@ class MerossDevice extends IPSModule
         // Äußere Methode je nach Firmware unterschiedlich -> GET und SET versuchen
         foreach (['GET', 'SET'] as $outer) {
             $resp = $this->LocalRequest('Appliance.Control.Multiple', $outer, ['multiple' => $multiple]);
-            $list = $resp['payload']['multiple'] ?? null;
-            if (!is_array($list)) {
-                continue;
+            if ($resp !== null) {
+                return $resp;
             }
-            foreach ($list as $entry) {
-                $ns = $entry['header']['namespace'] ?? '';
-                if ($ns === $wantNamespace) {
-                    return $entry['payload'] ?? null;
-                }
+        }
+        return null;
+    }
+
+    // Holt aus einem Multiple-Bündel das Sub-Payload des gewünschten Namespace.
+    private function LocalRequestMultiple(string $wantNamespace, array $subs)
+    {
+        $resp = $this->LocalRequestMultipleRaw($subs);
+        foreach (($resp['payload']['multiple'] ?? []) as $entry) {
+            if (($entry['header']['namespace'] ?? '') === $wantNamespace) {
+                return $entry['payload'] ?? null;
             }
-            // Bündel beantwortet, gesuchter Namespace aber nicht enthalten
-            return null;
         }
         return null;
     }
