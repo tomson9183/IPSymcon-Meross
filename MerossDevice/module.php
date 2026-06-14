@@ -286,6 +286,12 @@ class MerossDevice extends IPSModule
             $lines[] = '';
         }
 
+        // 2b) Luftfeuchte-Sensor (z. B. MTS215B)
+        $sl = $this->LocalRequest('Appliance.Control.Sensor.Latest', 'GET', []);
+        $lines[] = '=== Appliance.Control.Sensor.Latest ===';
+        $lines[] = ($sl === null) ? 'keine Antwort' : json_encode($sl['payload'] ?? null);
+        $lines[] = '';
+
         // 3) Die gefundenen Thermostat-Namespaces roh auslesen
         $probe = $thermo ?: ['Appliance.Control.Thermostat.ModeB', 'Appliance.Control.Thermostat.Mode'];
         foreach ($probe as $ns) {

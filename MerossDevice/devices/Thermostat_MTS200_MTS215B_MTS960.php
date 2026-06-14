@@ -166,28 +166,17 @@ trait ThermostatDevice
             $this->SetValue('MODE', $mode);
         }
 
-        // Luftfeuchte (nur Modelle, die sie liefern, z. B. MTS215B) – per Feature-Erkennung:
-        // irgendein Feld, dessen Name "humi" enthält, oder ein verschachteltes humidity-Objekt.
+        // Luftfeuchte: selten im Mode-Payload; beim MTS215B über
+        // Appliance.Control.Sensor.Latest (latest[].value[].humi, Zehntel-%).
         $humi = null;
         foreach ($d as $k => $v) {
-            if (is_numeric($v) && stripos((string) $k, 'humi') !== false) {
-                $humi = (float) $v;
-                break;
-            }
+            if (is_numeric($v) && stripos((string) $k, 'humi') !== false) { $humi = (float) $v; break; }
         }
-        if ($humi === null && isset($d['humidity'])) {
-            $h = $d['humidity'];
-            if (is_array($h)) {
-                $h = $h['latest'] ?? ($h['value'] ?? ($h['current'] ?? null));
-            }
-            if ($h !== null && is_numeric($h)) {
-                $humi = (float) $h;
-            }
+        if ($humi === null) {
+            $humi = $this->ThermoReadHumidity();
         }
         if ($humi !== null) {
-            if ($humi > 100) {
-                $humi = $humi / 10.0; // Zehntel-Prozent -> Prozent
-            }
+            if ($humi > 100) { $humi = $humi / 10.0; } // Zehntel-Prozent -> Prozent
             if (@$this->GetIDForIdent('HUMI') === false) {
                 $this->RegisterVariableFloat('HUMI', $this->Translate('Luftfeuchte'), '~Humidity.F', 25);
             }
@@ -196,6 +185,28 @@ trait ThermostatDevice
 
         // Kachel live aktualisieren
         $this->ThermoPushVisu();
+    }
+
+    // Luftfeuchte über Appliance.Control.Sensor.Latest (z. B. MTS215B).
+    // Antwort: {"latest":[{"channel":0,"value":[{"humi":596,...}]}]}  -> 596 = 59,6 %.
+    // Liefert den Rohwert (% oder Zehntel-%) oder null, wenn das Gerät nichts liefert.
+    private function ThermoReadHumidity()
+    {
+        $r = $this->LocalRequest('Appliance.Control.Sensor.Latest', 'GET', []);
+        if ($r === null) {
+            return null;
+        }
+        foreach (($r['payload']['latest'] ?? []) as $chD) {
+            if (isset($chD['humi']) && is_numeric($chD['humi'])) {
+                return (float) $chD['humi'];
+            }
+            foreach ((array) ($chD['value'] ?? []) as $entry) {
+                if (is_array($entry) && isset($entry['humi']) && is_numeric($entry['humi'])) {
+                    return (float) $entry['humi'];
+                }
+            }
+        }
+        return null;
     }
 
     // ---- HTML-SDK: interaktive Kachel -------------------------------------
