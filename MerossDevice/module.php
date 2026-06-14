@@ -50,6 +50,9 @@ class MerossDevice extends IPSModule
         // Eigenständige WLAN-Thermostate: erkannte Variante/Skalierung merken
         $this->RegisterAttributeString('ThermoVariant', '');
         $this->RegisterAttributeInteger('ThermoScale', 10);
+        // Luftfeuchte-Status: 0 = unbekannt (abfragen), 1 = vorhanden, 2 = nicht vorhanden
+        $this->RegisterAttributeInteger('ThermoHumiState', 0);
+        $this->RegisterAttributeInteger('ThermoHumiTries', 0);
 
         $this->RegisterTimer('MERO_Poll', 0, 'MERO_Update($_IPS[\'TARGET\']);');
         $this->RegisterTimer('MERO_RollerFollow', 0, 'MERO_RollerFollowTick($_IPS[\'TARGET\']);');
@@ -293,11 +296,10 @@ class MerossDevice extends IPSModule
         // Multiple funktioniert (signiert). Jetzt mehrere Feuchte-Quellen/Payloads
         // im Bündel proben und jede zurückgegebene Teil-Antwort einzeln auflisten.
         $probe = $this->LocalRequestMultipleRaw([
+            ['Appliance.System.All', 'GET', []],
             ['Appliance.Control.Sensor.Latest', 'GET', ['latest' => [['channel' => 0]]]],
             ['Appliance.Control.Sensor.History', 'GET', []],
             ['Appliance.Control.Thermostat.Sensor', 'GET', []],
-            ['Appliance.Control.Thermostat.Frost', 'GET', []],
-            ['Appliance.Control.Thermostat.Overheat', 'GET', []],
         ]);
         $lines[] = '=== Multiple Feuchte-Probe (Teil-Antworten) ===';
         if ($probe === null) {

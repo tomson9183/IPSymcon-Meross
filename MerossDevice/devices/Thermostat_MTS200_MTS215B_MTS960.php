@@ -166,21 +166,32 @@ trait ThermostatDevice
             $this->SetValue('MODE', $mode);
         }
 
-        // Luftfeuchte: selten im Mode-Payload; beim MTS215B über
-        // Appliance.Control.Sensor.Latest (latest[].value[].humi, Zehntel-%).
-        $humi = null;
-        foreach ($d as $k => $v) {
-            if (is_numeric($v) && stripos((string) $k, 'humi') !== false) { $humi = (float) $v; break; }
-        }
-        if ($humi === null) {
-            $humi = $this->ThermoReadHumidity();
-        }
-        if ($humi !== null) {
-            if ($humi > 100) { $humi = $humi / 10.0; } // Zehntel-Prozent -> Prozent
-            if (@$this->GetIDForIdent('HUMI') === false) {
-                $this->RegisterVariableFloat('HUMI', $this->Translate('Luftfeuchte'), '~Humidity.F', 25);
+        // Luftfeuchte: selten im Mode-Payload; sonst via Sensor.Latest (auch im Multiple).
+        // Status gemerkt, damit Geräte ohne Feuchte (z. B. MTS215B/Matter) nicht endlos
+        // abgefragt werden: 0=unbekannt, 1=vorhanden, 2=nicht vorhanden.
+        $hState = (int) $this->ReadAttributeInteger('ThermoHumiState');
+        if ($hState !== 2) {
+            $humi = null;
+            foreach ($d as $k => $v) {
+                if (is_numeric($v) && stripos((string) $k, 'humi') !== false) { $humi = (float) $v; break; }
             }
-            $this->SetValue('HUMI', round($humi, 1));
+            if ($humi === null) {
+                $humi = $this->ThermoReadHumidity();
+            }
+            if ($humi !== null) {
+                if ($humi > 100) { $humi = $humi / 10.0; } // Zehntel-Prozent -> Prozent
+                if (@$this->GetIDForIdent('HUMI') === false) {
+                    $this->RegisterVariableFloat('HUMI', $this->Translate('Luftfeuchte'), '~Humidity.F', 25);
+                }
+                $this->SetValue('HUMI', round($humi, 1));
+                $this->WriteAttributeInteger('ThermoHumiState', 1);
+            } elseif ($hState === 0) {
+                $tries = (int) $this->ReadAttributeInteger('ThermoHumiTries') + 1;
+                $this->WriteAttributeInteger('ThermoHumiTries', $tries);
+                if ($tries >= 5) {
+                    $this->WriteAttributeInteger('ThermoHumiState', 2); // liefert lokal keine Feuchte
+                }
+            }
         }
 
         // Kachel live aktualisieren
