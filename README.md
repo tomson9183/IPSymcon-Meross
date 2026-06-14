@@ -5,10 +5,6 @@ LAN. Die Meross-Cloud wird **nur einmalig** beim Einrichten genutzt (Gerätelist
 Konto-Key und lokale IPs holen) – im Betrieb läuft alles lokal: **kein MQTT, kein
 Dauer-Cloud-Zwang, kein Python**.
 
-> Dieses Projekt steht in **keiner Verbindung** zu Meross oder zu Symcon. „Meross",
-> „IP-Symcon"/„Symcon" sind Marken der jeweiligen Inhaber und werden hier nur zur
-> Beschreibung der Kompatibilität genannt.
-
 ## Funktionsumfang
 - Lokale Steuerung per signiertem HTTP an `http://<geräte-ip>/config`, Status per Polling.
 - **Konfigurator**: erkennt deine Geräte automatisch aus der Cloud und legt die
@@ -84,27 +80,14 @@ an; die Geräte-Instanzen selbst **nie**.
 - **Kachel leer / falsch skaliert:** Im Browser Visu neu laden; Modul auf die neueste
   Version aktualisieren; ggf. „Kachel-Darstellung" fest auf Hell/Dunkel stellen.
 
-## Rechtliche Hinweise / Haftungsausschluss
-- **Inoffiziell:** Freies Community-Modul, **keine Verbindung** zu Meross (Chengdu Meross
-  Technology Co., Ltd.) oder zu Symcon und von diesen **nicht unterstützt/geprüft**.
-  „Meross", „IP-Symcon"/„Symcon" und Modellbezeichnungen sind Marken der jeweiligen
-  Inhaber (Nennung nur zur Kompatibilitätsbeschreibung, nominative Nutzung).
-- **Reverse Engineering / Meross-Nutzungsbedingungen:** Die genutzte Geräte-/Cloud-
-  Schnittstelle wurde durch die Community dokumentiert. Die [Meross-Nutzungsbedingungen](https://www.meross.com/en-gc/terms-of-use)
-  untersagen Reverse Engineering bzw. das Umgehen von Zugriffsmaßnahmen grundsätzlich
-  (mit Ausnahmen „soweit gesetzlich zulässig"). Dieses Modul dient ausschließlich der
-  **privaten, nicht-kommerziellen Interoperabilität** mit **eigenen Geräten** und
-  **eigenen Zugangsdaten**; in der EU bestehen gesetzliche Interoperabilitäts-Ausnahmen
-  (RL 2009/24/EG, § 69e UrhG). Eine Kollision mit den Meross-AGB ist dennoch nicht
-  vollständig auszuschließen – **Nutzung auf eigenes Risiko**.
-- **Keine Gewähr / Haftung:** Bereitstellung „wie besehen" ohne Gewährleistung (siehe
-  LICENSE/MIT). Haftung für Schäden/Fehlfunktionen/Datenverlust – soweit gesetzlich
-  zulässig – ausgeschlossen. Das gilt besonders für **sicherheitsrelevante Geräte**
-  (Garagentor, Heizung/Thermostat): Funktion und gefahrlose Bedienung eigenverantwortlich
-  prüfen.
-- **Daten:** Zugangsdaten und Konto-Key verbleiben in der eigenen IP-Symcon-Installation;
-  das Modul gibt sie nicht an Dritte weiter.
-- Diese Hinweise sind **keine Rechtsberatung**.
+## Hinweise
+- Inoffizielles Community-Modul, **keine Verbindung** zu Meross.
+- Die genutzte Schnittstelle ist Community-dokumentiert; bitte die
+  [Meross-Nutzungsbedingungen](https://www.meross.com/en-gc/terms-of-use) beachten.
+  Nutzung **privat, nicht-kommerziell, auf eigenes Risiko**.
+- Bereitstellung „wie besehen" ohne Gewähr (MIT) – besonders bei sicherheitsrelevanten
+  Geräten (Garagentor, Heizung) eigenverantwortlich prüfen.
+- Zugangsdaten und Konto-Key verbleiben in der eigenen IP-Symcon-Installation.
 
 ## Lizenz
 MIT – siehe [LICENSE](LICENSE).
