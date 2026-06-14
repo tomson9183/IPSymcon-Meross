@@ -200,12 +200,17 @@ trait ThermostatDevice
             }
         }
         // 2) Gebündelt über Appliance.Control.Multiple (Matter-Geräte wie MTS215B
-        //    antworten auf Einzel-GETs nicht, im Bündel aber oft schon)
-        $p = $this->LocalRequestMultiple('Appliance.Control.Sensor.Latest', [
-            ['Appliance.Control.Sensor.Latest', 'GET', []],
-        ]);
-        if (is_array($p)) {
-            return $this->ThermoExtractHumi($p['latest'] ?? null);
+        //    antworten auf Einzel-GETs nicht, im signierten Bündel aber schon)
+        foreach ([['latest' => [['channel' => 0]]], []] as $pl) {
+            $p = $this->LocalRequestMultiple('Appliance.Control.Sensor.Latest', [
+                ['Appliance.Control.Sensor.Latest', 'GET', $pl],
+            ]);
+            if (is_array($p)) {
+                $h = $this->ThermoExtractHumi($p['latest'] ?? null);
+                if ($h !== null) {
+                    return $h;
+                }
+            }
         }
         return null;
     }

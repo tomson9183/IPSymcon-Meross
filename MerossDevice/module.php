@@ -290,18 +290,27 @@ class MerossDevice extends IPSModule
         $sl = $this->LocalRequest('Appliance.Control.Sensor.Latest', 'GET', []);
         $lines[] = '=== Appliance.Control.Sensor.Latest (direkt) ===';
         $lines[] = ($sl === null) ? 'keine Antwort' : json_encode($sl['payload'] ?? null);
-        // Entscheidender Test: signiertes Multiple MIT System.All (das beantwortet
-        // das Gerät einzeln). Antwortet das Bündel -> Multiple funktioniert; sonst
-        // blockt das Gerät Appliance.Control.Multiple komplett.
-        $mtest = $this->LocalRequestMultipleRaw([
-            ['Appliance.System.All', 'GET', []],
-            ['Appliance.Control.Sensor.Latest', 'GET', []],
+        // Multiple funktioniert (signiert). Jetzt mehrere Feuchte-Quellen/Payloads
+        // im Bündel proben und jede zurückgegebene Teil-Antwort einzeln auflisten.
+        $probe = $this->LocalRequestMultipleRaw([
+            ['Appliance.Control.Sensor.Latest', 'GET', ['latest' => [['channel' => 0]]]],
+            ['Appliance.Control.Sensor.History', 'GET', []],
             ['Appliance.Control.Thermostat.Sensor', 'GET', []],
+            ['Appliance.Control.Thermostat.Frost', 'GET', []],
+            ['Appliance.Control.Thermostat.Overheat', 'GET', []],
         ]);
-        $lines[] = '=== Multiple-Test (signiert, mit System.All) ===';
-        $lines[] = ($mtest === null)
-            ? 'keine Antwort -> Geraet blockt Appliance.Control.Multiple komplett (Feuchte lokal nicht abrufbar)'
-            : json_encode($mtest['payload'] ?? null);
+        $lines[] = '=== Multiple Feuchte-Probe (Teil-Antworten) ===';
+        if ($probe === null) {
+            $lines[] = 'keine Antwort';
+        } else {
+            $subs = $probe['payload']['multiple'] ?? [];
+            if (!$subs) {
+                $lines[] = '(leer – Gerät liefert keine dieser Sub-Antworten)';
+            }
+            foreach ($subs as $e) {
+                $lines[] = ($e['header']['namespace'] ?? '?') . ' -> ' . json_encode($e['payload'] ?? null);
+            }
+        }
         $lines[] = '';
 
         // 3) Die gefundenen Thermostat-Namespaces roh auslesen
