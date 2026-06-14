@@ -192,18 +192,20 @@ trait ThermostatDevice
     // Liefert den Rohwert (% oder Zehntel-%) oder null, wenn das Gerät nichts liefert.
     private function ThermoReadHumidity()
     {
-        // Manche Geräte (MTS215B) antworten nicht auf leere GETs -> mehrere Payloads testen.
+        // 1) Direkt (funktioniert z. B. beim MTS200) – mehrere Payload-Varianten
         foreach ([[], ['latest' => []], ['latest' => [['channel' => 0]]]] as $pl) {
             $r = $this->LocalRequest('Appliance.Control.Sensor.Latest', 'GET', $pl);
-            if ($r === null) {
-                continue; // keine Antwort auf diese Payload-Variante -> nächste probieren
+            if ($r !== null) {
+                return $this->ThermoExtractHumi($r['payload']['latest'] ?? null);
             }
-            $h = $this->ThermoExtractHumi($r['payload']['latest'] ?? null);
-            if ($h !== null) {
-                return $h;
-            }
-            // Hat geantwortet, aber ohne Feuchte -> Latest liefert sie nicht
-            return null;
+        }
+        // 2) Gebündelt über Appliance.Control.Multiple (Matter-Geräte wie MTS215B
+        //    antworten auf Einzel-GETs nicht, im Bündel aber oft schon)
+        $p = $this->LocalRequestMultiple('Appliance.Control.Sensor.Latest', [
+            ['Appliance.Control.Sensor.Latest', 'GET', []],
+        ]);
+        if (is_array($p)) {
+            return $this->ThermoExtractHumi($p['latest'] ?? null);
         }
         return null;
     }
